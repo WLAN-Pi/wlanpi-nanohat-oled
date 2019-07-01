@@ -17,7 +17,7 @@ History:
  0.06 - Added simple table fuction & refactored several functions to use it
         Updated buttons to have optional new label 
         Added menu verion display (30/06/19)
- 0.07 - 
+ 0.07 - Added confirmation options to restart option menu selections (01/07/19)
 
 To do:
     1. Error handling to log?
@@ -620,48 +620,6 @@ def wconsole_switcher():
     return
 
 #######################
-# menu structure here
-#######################
-if current_mode == "wconsole":
-
-    menu = [
-          { "name": "1.Status", "action": [
-                { "name": "1.Interfaces", "action": show_interfaces},
-                { "name": "2.USB Devices", "action": show_usb},
-                { "name": "3.Version", "action": show_menu_ver},
-            ]
-          },
-          { "name":"2.Actions", "action": [
-                { "name": "1.Classic Mode",   "action": wconsole_switcher},
-                { "name": "2.Reboot",   "action": reboot},
-                
-            ]
-          }
-    ]
-    
-    # Ensure home menu title shows we are in wconsole mode
-    home_page_name = "Wconsole"
-    
-else:
-    # assume classic mode
-    menu = [
-          { "name": "1.Status", "action": [
-                { "name": "1.Summary", "action": show_summary},
-                { "name": "2.Date/Time", "action": show_date},
-                { "name": "3.Interfaces", "action": show_interfaces},
-                { "name": "4.USB Devices", "action": show_usb},
-                { "name": "5.Version", "action": show_menu_ver},
-            ]
-          },
-          { "name":"2.Actions", "action": [
-                { "name": "1.Reboot",   "action": reboot},
-                { "name": "2.Wconsole Mode",   "action": wconsole_switcher},
-                { "name": "3.Shutdown", "action": shutdown},
-            ]
-          }
-    ]
-
-#######################
 # other functions here
 #######################
 
@@ -722,6 +680,87 @@ def menu_left():
     else:
         is_menu_shown = True
         draw_page()
+
+def go_up():
+
+    # executed when the '..' navigation item is selected
+
+    global current_menu_location
+    global is_menu_shown
+    
+    is_menu_shown = True
+    
+    if len(current_menu_location) == 1:
+        # we must be at top level, do nothing
+        return
+    else:
+        # Take off last level of menu structure to go up
+        # Set index to 0 so top menu item selected
+        current_menu_location.pop()
+        current_menu_location[-1] = 0
+        
+        draw_page()
+
+#######################
+# menu structure here
+#######################
+if current_mode == "wconsole":
+
+    menu = [
+        { "name": "1.Status", "action": [
+                { "name": "1.Interfaces", "action": show_interfaces},
+                { "name": "2.USB Devices", "action": show_usb},
+                { "name": "3.Version", "action": show_menu_ver},
+            ]
+        },
+        { "name":"2.Actions", "action": [
+                { "name": "1.Classic Mode",   "action": [
+                    { "name": "Cancel", "action": go_up},
+                    { "name": "Confirm", "action": wconsole_switcher},
+                    ]
+                },
+                { "name": "2.Reboot",   "action": [
+                    { "name": "Cancel", "action": go_up},
+                    { "name": "Confirm", "action": reboot},
+                    ]
+                },
+            ]
+        },            
+    ]
+    
+    # Ensure home menu title shows we are in wconsole mode
+    home_page_name = "Wconsole"
+    
+else:
+    # assume classic mode
+    menu = [
+          { "name": "1.Status", "action": [
+                { "name": "1.Summary", "action": show_summary},
+                { "name": "2.Date/Time", "action": show_date},
+                { "name": "3.Interfaces", "action": show_interfaces},
+                { "name": "4.USB Devices", "action": show_usb},
+                { "name": "5.Version", "action": show_menu_ver},
+            ]
+          },
+          { "name":"2.Actions", "action": [
+                { "name": "1.Reboot",   "action": [
+                    { "name": "Cancel", "action": go_up},
+                    { "name": "Confirm", "action": reboot},
+                    ]
+                },
+                { "name": "2.Wconsole Mode",   "action": [
+                    { "name": "Cancel", "action": go_up},
+                    { "name": "Confirm", "action": wconsole_switcher},
+                    ]
+                },
+                { "name": "3.Shutdown", "action": [
+                    { "name": "Cancel", "action": go_up},
+                    { "name": "Confirm", "action": shutdown},
+                    ]
+                },
+            ]
+          }
+    ]
 
 # Set up handlers to process key pressses
 def receive_signal(signum, stack):
