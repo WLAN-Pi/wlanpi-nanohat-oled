@@ -1,2 +1,2 @@
 # wlanpi-nanohat-oled
-WLANPi OLED display navigatio/menu system
+WLANPi OLED display navigation/menu system
