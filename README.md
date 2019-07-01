@@ -15,6 +15,6 @@ If you would like to have a look at the current menu system on your WLANPi, down
 
 Once the file is installed, reboot the WLANPi and the new menu system should be visible on the OLED display.
 
-
+![WLANPi Menu](https://github.com/WLAN-Pi/wlanpi-nanohat-oled/blob/master/images/wlanpi_menu.jpg)
 
 
