@@ -15,14 +15,17 @@ History:
         Added clear_display() function
         Added standard display dialogue function (29/06/19)
  0.06 - Added simple table fuction & refactored several functions to use it
-        Updated buttons to have optional new label 
+        Updated nav buttons to have optional new label 
         Added menu verion display (30/06/19)
  0.07 - Added confirmation options to restart option menu selections (01/07/19)
+ 0.08 - Added check for interfaces in monitor mode 
+        Added scrolling in simple tables (02/07/2019)
 
 To do:
     1. Error handling to log?
     2. New display function to handle multiple pages
     3. Scrolling on simple pages
+    4. Add monitor mode indicator to wlan interface listing if appropriate
 
 
 '''
@@ -40,7 +43,7 @@ import socket
 import types
 import re
 
-__version__ = "0.07 (alpha)"
+__version__ = "0.08 (alpha)"
 __author__  = "wifinigel@gmail.com"
 
 ############################
@@ -101,7 +104,10 @@ option_selected = 0           # Content of currently selected menu level
 sig_fired = False             # Set to True when button handler fired
 home_page_name = "Home"       # Display name for top level menu
 current_mode = "classic"      # Currently selected mode (e.g. wconsole/classic)
-bottomLine = 55               # top pixel of nav bar
+nav_bar_top = 55              # top pixel of nav bar
+current_scroll_selection = 0  # where we currently are in scrolling table
+table_displayed = False       # True if we're currently in a table
+table_list_length = 0         # Total length of currently displayed table
 
 #######################################
 # Initialize file variables
@@ -109,6 +115,7 @@ bottomLine = 55               # top pixel of nav bar
 wconsole_mode_file = '/etc/wconsole/wconsole.on'
 wconsole_switcher_file = '/etc/wconsole/wconsole_switcher'
 ifconfig_file = '/sbin/ifconfig'
+iw_file = '/usr/sbin/iw'
 
 
 # check our current mode
@@ -136,8 +143,8 @@ def get_ip():
 ##########################
 def nav_button(label, position):
     global draw
-    global bottomLine
-    draw.text((position,bottomLine),label,font=smartFont,fill=255)
+    global nav_bar_top
+    draw.text((position,nav_bar_top),label,font=smartFont,fill=255)
     return
     
 def back_button(label="Back"):
@@ -202,18 +209,22 @@ def display_dialog_msg(msg_list, back_button_req=0):
     
     return True
 
-def display_simple_table(item_list, back_button_req=0):
+def display_simple_table(item_list, back_button_req=0, title=''):
 
     #FIXME: this needs scrolling if num items > 4. Add contextual up/down
     #       labels to buttons
-    #FIXME: Add optonal title?
+    #FIXME: Add optional title?
 
     global drawing_in_progress
     global draw
     global oled
     global is_menu_shown
+    global current_scroll_selection
+    global table_displayed
+    global table_list_length
 
     drawing_in_progress = True
+    table_displayed = True
     
     # Clear display prior to painting new item
     clear_display()
@@ -226,6 +237,33 @@ def display_simple_table(item_list, back_button_req=0):
     table_display_max = 4
     scrolling_req = False
     
+    # write title if present
+    if title != '':
+        draw.text((x, y + font_offset), title.center(item_length_max, " "),  font=smartFont, fill=255)
+        font_offset += font_size
+        table_display_max -=1
+    
+    table_list_length = len(item_list)
+    
+    # if we're going to scroll of the end of the list, adjust pointer
+    if current_scroll_selection + table_display_max > table_list_length:
+        current_scroll_selection -=1
+    
+    # modify list to display if scrolling required
+    if table_list_length > table_display_max:
+    
+        table_bottom_entry = current_scroll_selection + table_display_max
+        item_list = item_list[current_scroll_selection: table_bottom_entry]
+
+        # show down if not at end of list in display window
+        if table_bottom_entry < table_list_length:
+            down_button()
+
+        
+        # show an up button if not at start of list
+        if current_scroll_selection > 0:
+            next_button(label="Up")
+    
     for item in item_list:
     
         if len(item) > item_length_max:
@@ -237,7 +275,7 @@ def display_simple_table(item_list, back_button_req=0):
     
     # Back button
     if back_button_req:
-        back_button()
+        back_button(label="Exit")
     
     oled.drawImage(image)
     
@@ -338,7 +376,7 @@ def draw_page():
     option_number_selected = node
     option_selected = menu_structure
     
-    # if we're at the top of the meny tree, show the home page title
+    # if we're at the top of the menu tree, show the home page title
     if depth == 1:
         page_title = ("[ " + home_page_name + " ]").center(17, " ")
     else:
@@ -373,14 +411,14 @@ def draw_page():
         rect_fill=0
         text_fill=255
     
-        # this is selected menu item: highlight it
+        # this is selected menu item: highlight it and remove * character
         if (menu_item[0] == '*'):
             rect_fill=255
             text_fill=0
             menu_item = menu_item[1:len(menu_item)]
             
         # convert menu item to std width format with nav indicator
-        menu_item = menu_item + ( (17 - len(menu_item)) * " ") + ">"
+        menu_item = "{:<17}>".format(menu_item)
     
         draw.rectangle((0, y, 127, y+y_offset), outline=0, fill=rect_fill)
         draw.text((1, y+1), menu_item,  font=font11, fill=text_fill)
@@ -471,6 +509,7 @@ def show_interfaces():
     '''
 
     global ifconfig_file
+    global iw_file
 
     try:
         ifconfig_info = subprocess.check_output(ifconfig_file, shell=True)
@@ -496,12 +535,21 @@ def show_interfaces():
             inet_search = re.search("inet (.+?) ", interface_info, re.MULTILINE)
             if inet_search is None:
                 ip_address = "No IP address"
+                
+                # do check if this is an interface in monitor mode
+                if (re.search("wlan\d", interface_name, re.MULTILINE)):
+
+                    # fire up 'iw' for this interface (hmmm..is this a bit of an un-necessary ovehead?)
+                    iw_info = subprocess.check_output('{} {} info'.format(iw_file, interface_name), shell=True)
+
+                    if re.search("type monitor", iw_info, re.MULTILINE):
+                        ip_address = "(Mon mode)"           
             else:
                 ip_address = inet_search.group(1)
             
             interfaces.append( interface_name + ": " + ip_address )
 
-    display_simple_table(interfaces, back_button_req=1)
+    display_simple_table(interfaces, back_button_req=1, title="--Interfaces--")
 
 def show_usb():
 
@@ -537,7 +585,7 @@ def show_usb():
     if len(interfaces) == 0:
         interfaces.append("No devices detected")
     
-    display_simple_table(interfaces, back_button_req=1)
+    display_simple_table(interfaces, back_button_req=1, title='--USB Interfaces--')
     
     return
 
@@ -628,6 +676,13 @@ def menu_down():
     global current_menu_location
     global menu
     global is_menu_shown
+    global table_displayed
+    global current_scroll_selection
+    
+    # If we are in a table, scroll down (unless at bottom of list)
+    if table_displayed:
+        current_scroll_selection +=1
+        return
     
     # Menu not currently shown, do nothing
     if is_menu_shown == False:
@@ -637,6 +692,7 @@ def menu_down():
     current_selection = current_menu_location.pop()
     current_selection = current_selection +1
     current_menu_location.append(current_selection)
+    
     draw_page()
     
 
@@ -647,6 +703,16 @@ def menu_right():
     global option_number_selected
     global option_selected
     global is_menu_shown
+    global table_displayed
+    global current_scroll_selection
+    
+    # If we are in a table, scroll up (unless at top of list)
+    if table_displayed:
+        if current_scroll_selection == 0:
+            return
+        else:
+            current_scroll_selection -=1
+            return
     
     # Check if the "action" field at the current location is an 
     # array or a function.
@@ -667,8 +733,20 @@ def menu_left():
     global option_number_selected
     global option_selected
     global is_menu_shown
+    global table_displayed
+    global current_scroll_selection
+    global table_list_length
     
-    
+    # If we're in a table we need to exit, reset table scroll counters
+    # and draw the menu for our current level
+    if table_displayed:
+        current_scroll_selection = 0
+        table_list_length = 0
+        table_displayed = False
+        is_menu_shown = True
+        draw_page()
+        return
+
     if is_menu_shown:
 
         # check to make sure we aren't at top of menu structure
