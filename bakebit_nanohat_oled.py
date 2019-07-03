@@ -20,13 +20,13 @@ History:
  0.07 - Added confirmation options to restart option menu selections (01/07/19)
  0.08 - Added check for interfaces in monitor mode 
         Added scrolling in simple tables (02/07/2019)
+ 0.09 - Added paged tables and WLAN interface detail option
 
 To do:
     1. Error handling to log?
-    2. New display function to handle multiple pages
-    3. Scrolling on simple pages
-    4. Add monitor mode indicator to wlan interface listing if appropriate
-
+    2. Vary sleep timer for main while loop (e.g. longer for less frequently
+       updating data)
+    3. Add ufw summary page
 
 '''
 
@@ -43,7 +43,7 @@ import socket
 import types
 import re
 
-__version__ = "0.08 (alpha)"
+__version__ = "0.09 (alpha)"
 __author__  = "wifinigel@gmail.com"
 
 ############################
@@ -211,9 +211,11 @@ def display_dialog_msg(msg_list, back_button_req=0):
 
 def display_simple_table(item_list, back_button_req=0, title=''):
 
-    #FIXME: this needs scrolling if num items > 4. Add contextual up/down
-    #       labels to buttons
-    #FIXME: Add optional title?
+    '''
+    This function takes a list and paints each entry as a line on a 
+    page. It also displays appropriate up/down scroll buttons if the 
+    entries passed exceed a page length
+    '''
 
     global drawing_in_progress
     global draw
@@ -232,9 +234,9 @@ def display_simple_table(item_list, back_button_req=0, title=''):
     y = 0
     x = 0
     font_offset = 0
-    font_size = 12
+    font_size = 11
     item_length_max = 20
-    table_display_max = 4
+    table_display_max = 5
     scrolling_req = False
     
     # write title if present
@@ -273,6 +275,105 @@ def display_simple_table(item_list, back_button_req=0, title=''):
         
         font_offset += font_size
     
+    # Back button
+    if back_button_req:
+        back_button(label="Exit")
+    
+    oled.drawImage(image)
+    
+    is_menu_shown = False
+    drawing_in_progress = False
+    
+    return
+
+def display_paged_table(table_data, back_button_req=0):
+
+    '''
+    This function takes several pages of information and displays on the 
+    display with appropriate pg up/down buttons
+    
+    table data is in format:
+    
+    data = {
+        'title' = 'page title',
+        'pages' = [
+                ['Page 1 line 1', Page 1 line 2, 'Page 1 line 3', 'Page 1 line 4'],
+                ['Page 2 line 1', Page 2 line 2, 'Page 2 line 3', 'Page 2 line 4'],
+                ['Page 3 line 1', Page 3 line 2, 'Page 3 line 3', 'Page 3 line 4'],
+                ...etc.
+        ]    
+    }
+    '''
+
+    global drawing_in_progress
+    global draw
+    global oled
+    global is_menu_shown
+    global current_scroll_selection
+    global table_displayed
+    global table_list_length
+
+    drawing_in_progress = True
+    table_displayed = True
+    
+    # Clear display prior to painting new item
+    clear_display()
+
+    y = 0
+    x = 0
+    font_offset = 0
+    font_size = 11
+    item_length_max = 20
+    table_display_max = 4
+    
+    # write title
+    title = table_data['title']
+    total_pages = len(table_data['pages'])
+    
+    if  total_pages > 1:
+        title += " ({}/{})".format(current_scroll_selection + 1, total_pages)
+
+    draw.text((x, y + font_offset), title.center(item_length_max, " "),  font=smartFont, fill=255)
+    
+    font_offset += font_size
+    
+    # Extract pages data
+    table_pages = table_data['pages']
+    page_count = len(table_pages)
+    
+    # Display the page selected - correct over-shoot of page down
+    if current_scroll_selection == page_count:
+        current_scroll_selection -=1
+    
+    # Correct over-shoot of page up
+    if current_scroll_selection == -1:
+        current_scroll_selection = 0
+    
+    page = table_pages[current_scroll_selection]
+    
+    # If the page has greater than table_display_max entries, slice it
+    if len(page) > table_display_max:
+        page = page[0:table_display_max]
+    
+    for item in page:
+    
+        if len(item) > item_length_max:
+            item = item[0:item_length_max]
+
+        draw.text((x, y + font_offset), item,  font=smartFont, fill=255)
+        
+        font_offset += font_size
+    
+    # if we're going need to scroll through pages, create buttons
+    if (page_count > 1):
+    
+        #if (current_scroll_selection < page_count) and (current_scroll_selection < page_count-1):
+        if current_scroll_selection < page_count-1:
+            down_button(label="PgDn")
+    
+        if (current_scroll_selection > 0) and (current_scroll_selection <= page_count -1):
+            next_button(label="PgUp")
+            
     # Back button
     if back_button_req:
         back_button(label="Exit")
@@ -501,9 +602,6 @@ def show_date():
 
 def show_interfaces():
 
-    # FIXME: what about instances with > 3/4 interfaces?
-    # FIXME: move get_interface_info in to this function?
-
     '''
     Return a list of interfaces found to be up, with IP address if available
     '''
@@ -551,12 +649,108 @@ def show_interfaces():
 
     display_simple_table(interfaces, back_button_req=1, title="--Interfaces--")
 
+def show_wlan_interfaces():
+
+    # Test data
+    data = {
+        'title': 'page title',
+        'pages': [
+                ['Page 1 line 1', 'Page 1 line 2', 'Page 1 line 3', 'Page 1 line 4'],
+                ['Page 2 line 1', 'Page 2 line 2', 'Page 2 line 3', 'Page 2 line 4'],
+                ['Page 3 line 1', 'Page 3 line 2', 'Page 3 line 3', 'Page 3 line 4'],
+                ['Page 4 line 1', 'Page 4 line 2', 'Page 4 line 3', 'Page 4 line 4'],
+                ['Page 5 line 1', 'Page 5 line 2', 'Page 5 line 3', 'Page 5 line 4'],
+        ]    
+    }
+    
+    '''
+    Create pages to summarise WLAN interface info
+    '''
+    
+    global ifconfig_file
+    global iw_file
+
+    try:
+        ifconfig_info = subprocess.check_output(ifconfig_file + " -s", shell=True)
+    except Exception as ex:
+        interfaces= [ "Err: ifconfig error" ]
+        display_simple_table(interfaces, back_button_req=1)
+        return
+
+    # Extract interface info
+    interface_re = re.findall('^(wlan\d)  ', ifconfig_info, re.DOTALL|re.MULTILINE)
+    if interface_re is None:
+        interfaces = [ "Error: match error"]
+    else:
+        
+        interfaces = []
+        for interface_name in interface_re:
+        
+            interface_info = []
+            
+            # use iw to find further info for each wlan interface
+            iw_info = subprocess.check_output("{} {} info".format(iw_file, interface_name), shell=True)
+            
+            # split the output in to an array
+            iw_list = iw_info.split('\n')
+            
+            interface_details = {}
+            
+            for iw_item in iw_list:
+            
+                iw_item = iw_item.strip()
+
+                fields = iw_item.split()
+                
+                # skip empty lines
+                if not fields:
+                    continue
+                
+                interface_details[fields[0]] = fields[1:] 
+            
+            # construct our page data - start with name
+            interface_info.append("Interface: " + interface_name)
+            
+            # SSID (if applicable)
+            if 'ssid' in interface_details.keys():
+                interface_info.append("SSID: " + str(interface_details['ssid'][0]))
+            else:
+                interface_info.append("SSID: N/A")
+                
+            # Mode
+            if 'type' in interface_details.keys():
+                interface_info.append("Mode: " + str(interface_details['type'][0]))
+            else:
+                interface_info.append("Mode: N/A")
+            
+            # Channel
+            if 'channel' in interface_details.keys():
+                interface_info.append("Ch: {} ({}Mhz)".format( str(interface_details['channel'][0]), str(interface_details['channel'][4]) ) )
+            else:
+                interface_info.append("Ch: unknown")
+            
+            # MAC
+            if 'addr' in interface_details.keys():
+                interface_info.append("Addr: " + str(interface_details['addr']))
+            else:
+                interface_info.append("Addr: unknown")
+             
+            interfaces.append(interface_info)
+            
+        # if we had no WLAN interfaces, insert message
+        if len(interfaces) == 0:
+            interfaces.append(['No Wlan Interfaces'])
+        
+    
+    data = {
+        'title': '-- WLAN I/F --',
+        'pages': interfaces
+    }    
+
+    display_paged_table(data, back_button_req=1)
+
 def show_usb():
 
-    # FIXME: what about when no devices detected?
-    # FIXME: what about instances with > 3/4 interfaces?
-    # FIXME: move get_usb_info in to this function?
-    
     '''
     Return a list of non-Linux USB interfaces found with the lsusb command
     '''
@@ -787,8 +981,9 @@ if current_mode == "wconsole":
     menu = [
         { "name": "1.Status", "action": [
                 { "name": "1.Interfaces", "action": show_interfaces},
-                { "name": "2.USB Devices", "action": show_usb},
-                { "name": "3.Version", "action": show_menu_ver},
+                { "name": "2.WLAN Interfaces", "action": show_wlan_interfaces},
+                { "name": "3.USB Devices", "action": show_usb},
+                { "name": "4.Version", "action": show_menu_ver},
             ]
         },
         { "name":"2.Actions", "action": [
@@ -816,8 +1011,9 @@ else:
                 { "name": "1.Summary", "action": show_summary},
                 { "name": "2.Date/Time", "action": show_date},
                 { "name": "3.Interfaces", "action": show_interfaces},
-                { "name": "4.USB Devices", "action": show_usb},
-                { "name": "5.Version", "action": show_menu_ver},
+                { "name": "4.WLAN Interfaces", "action": show_wlan_interfaces},
+                { "name": "5.USB Devices", "action": show_usb},
+                { "name": "6.Version", "action": show_menu_ver},
             ]
           },
           { "name":"2.Actions", "action": [
