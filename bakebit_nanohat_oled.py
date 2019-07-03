@@ -21,12 +21,14 @@ History:
  0.08 - Added check for interfaces in monitor mode 
         Added scrolling in simple tables (02/07/2019)
  0.09 - Added paged tables and WLAN interface detail option
+ 0.10 - re-arranged menu structure to give network pages own area
 
 To do:
     1. Error handling to log?
     2. Vary sleep timer for main while loop (e.g. longer for less frequently
        updating data)
     3. Add ufw summary page
+    4. Add screensaver fallback to gen status if no keys pressed for a minute?
 
 '''
 
@@ -43,7 +45,7 @@ import socket
 import types
 import re
 
-__version__ = "0.09 (alpha)"
+__version__ = "0.10 (alpha)"
 __author__  = "wifinigel@gmail.com"
 
 ############################
@@ -108,6 +110,7 @@ nav_bar_top = 55              # top pixel of nav bar
 current_scroll_selection = 0  # where we currently are in scrolling table
 table_displayed = False       # True if we're currently in a table
 table_list_length = 0         # Total length of currently displayed table
+result_cache = False          # used to cache results when paging info
 
 #######################################
 # Initialize file variables
@@ -116,6 +119,7 @@ wconsole_mode_file = '/etc/wconsole/wconsole.on'
 wconsole_switcher_file = '/etc/wconsole/wconsole_switcher'
 ifconfig_file = '/sbin/ifconfig'
 iw_file = '/usr/sbin/iw'
+ufw_file = '/usr/sbin/ufw'
 
 
 # check our current mode
@@ -541,6 +545,10 @@ def draw_page():
 ####################################
 def show_summary():
 
+    ''' 
+    Summary page - taken from original bakebit script
+    '''
+
     global width
     global height
     global draw
@@ -573,6 +581,10 @@ def show_summary():
     return
 
 def show_date():
+
+    ''' 
+    Date page - taken from original bakebit script
+    '''
 
     global width
     global height
@@ -651,18 +663,6 @@ def show_interfaces():
 
 def show_wlan_interfaces():
 
-    # Test data
-    data = {
-        'title': 'page title',
-        'pages': [
-                ['Page 1 line 1', 'Page 1 line 2', 'Page 1 line 3', 'Page 1 line 4'],
-                ['Page 2 line 1', 'Page 2 line 2', 'Page 2 line 3', 'Page 2 line 4'],
-                ['Page 3 line 1', 'Page 3 line 2', 'Page 3 line 3', 'Page 3 line 4'],
-                ['Page 4 line 1', 'Page 4 line 2', 'Page 4 line 3', 'Page 4 line 4'],
-                ['Page 5 line 1', 'Page 5 line 2', 'Page 5 line 3', 'Page 5 line 4'],
-        ]    
-    }
-    
     '''
     Create pages to summarise WLAN interface info
     '''
@@ -743,7 +743,7 @@ def show_wlan_interfaces():
         
     
     data = {
-        'title': '-- WLAN I/F --',
+        'title': '--WLAN I/F--',
         'pages': interfaces
     }    
 
@@ -780,6 +780,53 @@ def show_usb():
         interfaces.append("No devices detected")
     
     display_simple_table(interfaces, back_button_req=1, title='--USB Interfaces--')
+    
+    return
+
+def show_ufw():
+
+    '''
+    Return a list ufw ports
+    '''
+    global ufw_file
+    global result_cache
+    
+    ufw_info = []
+    
+    if result_cache == False:
+    
+        try:
+            ufw_output = subprocess.check_output(ufw_file + " status", shell=True)
+            ufw_info = ufw_output.split('\n')
+            result_cache = ufw_info # cache results
+        except Exception as ex:
+            error_descr = "Issue getting ufw info using ufw command"
+            interfaces= [ "Err: ufw error" ]
+            display_simple_table(interfaces, back_button_req=1)
+            return
+    else:
+        # we must have cached results from last time
+        ufw_info = result_cache
+        
+    port_entries = []
+
+    # lose top 4 & last 2 lines of output
+    ufw_info = ufw_info[4:-2]
+
+    for result in ufw_info:
+    
+        # tidy/compress the output
+        result = result.strip()
+        result_list = result.split()
+        
+        final_result = '/'.join(result_list)
+    
+        port_entries.append(result)
+        
+    if len(port_entries) == 0:
+        port_entries.append("No ufw info detected")
+    
+    display_simple_table(port_entries, back_button_req=1, title='--UFW Summary--')
     
     return
 
@@ -930,15 +977,17 @@ def menu_left():
     global table_displayed
     global current_scroll_selection
     global table_list_length
+    global result_cache
     
-    # If we're in a table we need to exit, reset table scroll counters
-    # and draw the menu for our current level
+    # If we're in a table we need to exit, reset table scroll counters, reset
+    # resut cache and draw the menu for our current level
     if table_displayed:
         current_scroll_selection = 0
         table_list_length = 0
         table_displayed = False
         is_menu_shown = True
         draw_page()
+        result_cache = False
         return
 
     if is_menu_shown:
@@ -979,14 +1028,19 @@ def go_up():
 if current_mode == "wconsole":
 
     menu = [
-        { "name": "1.Status", "action": [
+        { "name": "1.Network", "action": [
                 { "name": "1.Interfaces", "action": show_interfaces},
                 { "name": "2.WLAN Interfaces", "action": show_wlan_interfaces},
                 { "name": "3.USB Devices", "action": show_usb},
-                { "name": "4.Version", "action": show_menu_ver},
+                { "name": "4.UFW Ports", "action": show_ufw},
             ]
         },
-        { "name":"2.Actions", "action": [
+        { "name": "2.Status", "action": [
+                { "name": "1.Summary", "action": show_summary},
+                { "name": "2.Version", "action": show_menu_ver},
+            ]
+        },
+        { "name":"3.Actions", "action": [
                 { "name": "1.Classic Mode",   "action": [
                     { "name": "Cancel", "action": go_up},
                     { "name": "Confirm", "action": wconsole_switcher},
@@ -1007,16 +1061,20 @@ if current_mode == "wconsole":
 else:
     # assume classic mode
     menu = [
-          { "name": "1.Status", "action": [
-                { "name": "1.Summary", "action": show_summary},
-                { "name": "2.Date/Time", "action": show_date},
-                { "name": "3.Interfaces", "action": show_interfaces},
-                { "name": "4.WLAN Interfaces", "action": show_wlan_interfaces},
-                { "name": "5.USB Devices", "action": show_usb},
-                { "name": "6.Version", "action": show_menu_ver},
+          { "name": "1.Network", "action": [
+                { "name": "1.Interfaces", "action": show_interfaces},
+                { "name": "2.WLAN Interfaces", "action": show_wlan_interfaces},
+                { "name": "3.USB Devices", "action": show_usb},
+                { "name": "4.UFW Ports", "action": show_ufw},
             ]
           },
-          { "name":"2.Actions", "action": [
+          { "name": "2.Status", "action": [
+                { "name": "1.Summary", "action": show_summary},
+                { "name": "2.Date/Time", "action": show_date},
+                { "name": "3.Version", "action": show_menu_ver},
+            ]
+          },
+          { "name":"3.Actions", "action": [
                 { "name": "1.Reboot",   "action": [
                     { "name": "Cancel", "action": go_up},
                     { "name": "Confirm", "action": reboot},
