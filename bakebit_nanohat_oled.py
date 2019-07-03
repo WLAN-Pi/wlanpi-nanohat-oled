@@ -21,14 +21,14 @@ History:
  0.08 - Added check for interfaces in monitor mode 
         Added scrolling in simple tables (02/07/2019)
  0.09 - Added paged tables and WLAN interface detail option
- 0.10 - re-arranged menu structure to give network pages own area
+ 0.10 - Re-arranged menu structure to give network pages own area
+        Added UFW info (03/07/19)
 
 To do:
     1. Error handling to log?
     2. Vary sleep timer for main while loop (e.g. longer for less frequently
        updating data)
-    3. Add ufw summary page
-    4. Add screensaver fallback to gen status if no keys pressed for a minute?
+    3. Add screensaver fallback to gen status if no keys pressed for a minute?
 
 '''
 
