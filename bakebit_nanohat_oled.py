@@ -23,12 +23,16 @@ History:
  0.09 - Added paged tables and WLAN interface detail option
  0.10 - Re-arranged menu structure to give network pages own area
         Added UFW info (03/07/19)
+ 0.11 - Added check that UFW installed & fixed missing info issue from 0.10
+        Added display_list_as_paged_table() as alternative to simple table
+        page as provide better scrolling experience (04/07/19)
 
 To do:
     1. Error handling to log?
     2. Vary sleep timer for main while loop (e.g. longer for less frequently
        updating data)
     3. Add screensaver fallback to gen status if no keys pressed for a minute?
+    4. Add a screen-lock
 
 '''
 
@@ -45,7 +49,7 @@ import socket
 import types
 import re
 
-__version__ = "0.10 (alpha)"
+__version__ = "0.11 (alpha)"
 __author__  = "wifinigel@gmail.com"
 
 ############################
@@ -218,7 +222,7 @@ def display_simple_table(item_list, back_button_req=0, title=''):
     '''
     This function takes a list and paints each entry as a line on a 
     page. It also displays appropriate up/down scroll buttons if the 
-    entries passed exceed a page length
+    entries passed exceed a page length (one line at a time)
     '''
 
     global drawing_in_progress
@@ -241,7 +245,6 @@ def display_simple_table(item_list, back_button_req=0, title=''):
     font_size = 11
     item_length_max = 20
     table_display_max = 5
-    scrolling_req = False
     
     # write title if present
     if title != '':
@@ -294,7 +297,7 @@ def display_paged_table(table_data, back_button_req=0):
 
     '''
     This function takes several pages of information and displays on the 
-    display with appropriate pg up/down buttons
+    display with appropriate pg up/pg down buttons
     
     table data is in format:
     
@@ -389,6 +392,33 @@ def display_paged_table(table_data, back_button_req=0):
     
     return
 
+def display_list_as_paged_table(item_list, back_button_req=0, title=''):
+
+    '''
+    This function builds on display_paged_table() and creates a paged display
+    from a simple list of results. This provides a better experience that the 
+    simple line-by-line scrolling provided in display_simple_table()
+
+    See display_paged_table() for required data structure
+    '''
+    data = {}
+    
+    data['title'] = title
+    data['pages'] = []
+    
+    # slice up list in to pages
+    table_display_max = 4
+    
+    counter=0
+    while item_list:
+        slice = item_list[counter: counter+table_display_max]
+        data['pages'].append(slice)
+        item_list = item_list[counter+table_display_max:]
+
+    display_paged_table(data, back_button_req)
+    
+    return
+    
 ##############################################
 # Main function to draw menu navigation pages
 ##############################################
@@ -476,17 +506,18 @@ def draw_page():
         
         # move down to next level of menu structure & repeat for new level
         menu_structure = menu_structure[node]['action']
-        
-        
+                
     option_number_selected = node
     option_selected = menu_structure
     
     # if we're at the top of the menu tree, show the home page title
     if depth == 1:
-        page_title = ("[ " + home_page_name + " ]").center(17, " ")
+        page_name = home_page_name
     else:
         # otherwise show the name of the parent menu item
-        page_title = ("[ " + section_name[-2] + " ]").center(17, " ")
+        page_name = section_name[-2]
+        
+    page_title = ("[  " + page_name + "  ]").center(17, " ")
     
     # Clear display prior to painting new item
     clear_display()
@@ -505,9 +536,11 @@ def draw_page():
     # determine the menu list to show based on current selection and window limits
     if (len(menu_list) > table_window):
     
+        # We've got more items than we can fit in our window, need to slice to fit
         if (option_number_selected >= table_window):
             menu_list = menu_list[(option_number_selected - (table_window - 1)): option_number_selected + 1]
         else:
+            # We have enough space for the menu items, so no special treatment required
             menu_list = menu_list[0 : table_window]
     
     # paint the menu items, highlighting selected menu item
@@ -584,6 +617,9 @@ def show_date():
 
     ''' 
     Date page - taken from original bakebit script
+    
+    FIXME: Add in timezone
+    
     '''
 
     global width
@@ -615,7 +651,7 @@ def show_date():
 def show_interfaces():
 
     '''
-    Return a list of interfaces found to be up, with IP address if available
+    Return a list of network interfaces found to be up, with IP address if available
     '''
 
     global ifconfig_file
@@ -628,9 +664,10 @@ def show_interfaces():
         display_simple_table(interfaces, back_button_req=1)
         return
 
-    # Extract interface info
+    # Extract interface info with a bit of regex magic
     interface_re = re.findall('^(\w+?)\: flags(.*?)RX packets', ifconfig_info, re.DOTALL|re.MULTILINE)
     if interface_re is None:
+        # Something broke is our regex - report an issue
         interfaces = [ "Error: match error"]
     else:
         interfaces = []
@@ -657,9 +694,9 @@ def show_interfaces():
             else:
                 ip_address = inet_search.group(1)
             
-            interfaces.append( interface_name + ": " + ip_address )
+            interfaces.append( '{}: {}'.format(interface_name, ip_address))
 
-    display_simple_table(interfaces, back_button_req=1, title="--Interfaces--")
+    display_list_as_paged_table(interfaces, back_button_req=1, title="--Interfaces--")
 
 def show_wlan_interfaces():
 
@@ -671,7 +708,7 @@ def show_wlan_interfaces():
     global iw_file
 
     try:
-        ifconfig_info = subprocess.check_output(ifconfig_file + " -s", shell=True)
+        ifconfig_info = subprocess.check_output('{} -s'.format(ifconfig_file), shell=True)
     except Exception as ex:
         interfaces= [ "Err: ifconfig error" ]
         display_simple_table(interfaces, back_button_req=1)
@@ -793,10 +830,19 @@ def show_ufw():
     
     ufw_info = []
     
+    # check wconsole is available
+    if not os.path.isfile(ufw_file):
+        
+        display_dialog_msg(['UFW not', 'installed'], back_button_req=1)
+        
+        is_menu_shown = False
+        return
+    
+    # If no cached ufw data from previous screen paint, run ufw status
     if result_cache == False:
     
         try:
-            ufw_output = subprocess.check_output(ufw_file + " status", shell=True)
+            ufw_output = subprocess.check_output("{} status".format(ufw_file), shell=True)
             ufw_info = ufw_output.split('\n')
             result_cache = ufw_info # cache results
         except Exception as ex:
@@ -809,24 +855,28 @@ def show_ufw():
         ufw_info = result_cache
         
     port_entries = []
+    
+    # Add in status line
+    port_entries.append(ufw_info[0])
 
     # lose top 4 & last 2 lines of output
     ufw_info = ufw_info[4:-2]
 
     for result in ufw_info:
-    
+        
         # tidy/compress the output
         result = result.strip()
         result_list = result.split()
         
-        final_result = '/'.join(result_list)
+        final_result = ' '.join(result_list)
     
-        port_entries.append(result)
+        port_entries.append(final_result)
         
     if len(port_entries) == 0:
         port_entries.append("No ufw info detected")
     
-    display_simple_table(port_entries, back_button_req=1, title='--UFW Summary--')
+    #display_simple_table(port_entries, back_button_req=1, title='--UFW Summary--')
+    display_list_as_paged_table(port_entries, back_button_req=1, title='--UFW Summary--')
     
     return
 
@@ -895,9 +945,9 @@ def wconsole_switcher():
     
     if current_mode == "classic":
         # if in classic mode, switch to wconsole
-        subprocess.call(wconsole_switcher_file + " on", shell=True)
+        subprocess.call("{} on".format(wconsole_switcher_file), shell=True)
     elif current_mode == "wconsole":
-        subprocess.call(wconsole_switcher_file + " off", shell=True)
+        subprocess.call("{} off".format(wconsole_switcher_file), shell=True)
     else:
         print "Hit unknown mode in wconsole switcher"
         return
