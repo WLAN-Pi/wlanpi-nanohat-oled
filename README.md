@@ -35,3 +35,20 @@ The menu navigation system concepts are shown below:
 ![WLANPi Menu Navigation](https://github.com/WLAN-Pi/wlanpi-nanohat-oled/blob/master/images/Navigation.png)
 
 
+## Adding to the Menu Navigation Hierarchy
+
+The menu system has been coded to (hopefully) be very straight forward to extend and add new features.
+
+The menu system is defined by a Python hierarchical data structure. By adding new options at the required menu level, new options willl automatically appear in the menu system next time that the WLANPi is booted.
+
+The data structure is shown (with annotations) below:
+
+
+![WLANPi Menu Data Structure](https://github.com/WLAN-Pi/wlanpi-nanohat-oled/blob/master/images/Menu_Data_Structure.png)
+
+The initial data structure has just 2 menu levels, but could be extended to further depths if required by simply extending the data structure.
+
+The annotations above show the data structure definition, with indicators for the top level menu items and sub-menus hanging off them. My adding more items at the appropriate levels, additional top-level options or completely new sub-menus can be added as required.
+
+At the end of each menu path is a dispatcher. This is the name of a function that is called and actually creates some page content to look at. This will generally require a system (Linux) command to be run by the function and present the information in a textual list of some type. 
+
