@@ -63,7 +63,7 @@ One thing to remember is that you have to be very concise with the output as we 
 
 ## Global Variables
 
-If you take a look at the source code of bakebit_nanohat_oled.py, you may be a bit horrified by the use of global variables throughout the script. I was too when I first looked at the sameple scripts provided with the WLANPi. Unfortunately, they seem to be a necessary evil due to the nature of the whole thing being driven by system interrupts each time a front panel button is pressed.
+If you take a look at the source code of bakebit_nanohat_oled.py, you may be a bit horrified by the use of global variables throughout the script. I was too when I first looked at the sample scripts provided with the WLANPi. Unfortunately, they seem to be a necessary evil due to the nature of the whole thing being driven by system interrupts each time a front panel button is pressed.
 
 When a button is pressed, the flow of the script is taken over by the interrupt event and the interpreter processes the function associated with the button signal. Global variables seem to be preserved at all times, so they provide a good way of signalling state between the main script loop and any interrupts that happen when buttons are pressed. It is best to assume that any code you add could get interrupted by the system, so checking state in global variables is a good indication of the state of the system before taking any action.
 
