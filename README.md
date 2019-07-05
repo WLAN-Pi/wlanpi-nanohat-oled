@@ -17,4 +17,21 @@ Once the file is installed, reboot the WLANPi and the new menu system should be 
 
 ![WLANPi Menu](https://github.com/WLAN-Pi/wlanpi-nanohat-oled/blob/master/images/wlanpi_menu.jpg)
 
+## Menu Structure
+
+As we have only 3 buttons on the front of the WLANPi, an easy-to-use navigation system is quite tricky to provide. The approach adopted uses a hierarchical menu system, with pages of system information accessed from different parts of the menu structure. At any point in time, the display shows either a navigation menu or a page of information.
+
+At the bottom of each screen display, contextual button labels are provided that show the available navigation options.
+
+To move vertically through a menu, a "Down" button is provided. By repeatedly hitting the "Down" button, it is possible to move through all available menu options. If more than one screenful of menu items are avalable, then scrolling down will move through all available options in a circular path. Hitting the "Next" button will move to a sub-menu level, or select a page of information, depending on the current level in the menu structure.
+
+When a menu structure is displayed, a "Back" button is provided to move back up to parent menu items. 
+
+When a page of information is being displayed, an "Exit" button is provided to exit back to the navigation menu. When a page is displayed, if there is more than one screen of information to display, page up/down buttons are provided to allow all information to be reviewed.
+
+The menu navigation system concepts are shown below:
+
+
+![WLANPi Menu Navigation](https://github.com/WLAN-Pi/wlanpi-nanohat-oled/blob/master/images/Navigation.png)
+
 
