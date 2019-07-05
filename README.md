@@ -50,5 +50,21 @@ The initial data structure has just 2 menu levels, but could be extended to furt
 
 The annotations above show the data structure definition, with indicators for the top level menu items and sub-menus hanging off them. My adding more items at the appropriate levels, additional top-level options or completely new sub-menus can be added as required.
 
-At the end of each menu path is a dispatcher. This is the name of a function that is called and actually creates some page content to look at. This will generally require a system (Linux) command to be run by the function and present the information in a textual list of some type. 
+### Dispatchers
 
+At the end of each menu path is a dispatcher. This is the name of a function that is called when a menu option at the end of the menu tree is selected. It creates some useful (non-menu) page content to show on the OLED display.
+
+This will generally require a system (Linux) command to be run by the function and present the information in a textual list of some type. 
+
+To get an idea of how to code a dispatcher function, take a look at the source code of bakebit_nanohat_oled.py and you'll see several examples which will be very easy to re-purpose. 
+
+One thing to remember is that you have to be very concise with the output as we have very little screen real-estate to play with. The functions that are used to automagically display the info you may throw at them will try to keep things to a reasonable size and add paging, but they have their limits.
+
+
+## Global Variables
+
+If you take a look at the source code of bakebit_nanohat_oled.py, you may be a bit horrified by the use of global variables throughout the script. I was too when I first looked at the sameple scripts provided with the WLANPi. Unfortunately, they seem to be a necessary evil due to the nature of the whole thing being driven by system interrupts each time a front panel button is pressed.
+
+When a button is pressed, the flow of the script is taken over by the interrupt event and the interpreter processes the function associated with the button signal. Global variables seem to be preserved at all times, so they provide a good way of signalling state between the main script loop and any interrupts that happen when buttons are pressed. It is best to assume that any code you add could get interrupted by the system, so checking state in global variables is a good indication of the state of the system before taking any action.
+
+I've tried to add a bit more of an explanation in the source code notes for anyone who may be interested in this area. A lot of this has been derived from observations and testing during development of the script, so there may still be holes in my knowledge in this area.
