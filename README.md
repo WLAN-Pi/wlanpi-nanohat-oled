@@ -68,3 +68,7 @@ If you take a look at the source code of bakebit_nanohat_oled.py, you may be a b
 When a button is pressed, the flow of the script is taken over by the interrupt event and the interpreter processes the function associated with the button signal. Global variables seem to be preserved at all times, so they provide a good way of signalling state between the main script loop and any interrupts that happen when buttons are pressed. It is best to assume that any code you add could get interrupted by the system, so checking state in global variables is a good indication of the state of the system before taking any action.
 
 I've tried to add a bit more of an explanation in the source code notes for anyone who may be interested in this area. A lot of this has been derived from observations and testing during development of the script, so there may still be holes in my knowledge in this area.
+
+## Acknowledgements
+
+Props to Bryce Royal for the early work on this initiative and his ideas around the screen layout.
