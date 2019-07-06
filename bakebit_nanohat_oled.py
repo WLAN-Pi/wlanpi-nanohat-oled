@@ -26,13 +26,14 @@ History:
  0.11 - Added check that UFW installed & fixed missing info issue from 0.10
         Added display_list_as_paged_table() as alternative to simple table
         page as provide better scrolling experience (04/07/19)
+ 0.12 - Replaced 'is_menu_shown' and 'table_displayed' with single 'display state'
+        variable 
+        Added timezone to date page (06/07/19)
 
 To do:
     1. Error handling to log?
-    2. Vary sleep timer for main while loop (e.g. longer for less frequently
-       updating data)
-    3. Add screensaver fallback to gen status if no keys pressed for a minute?
-    4. Add a screen-lock
+    2. Add screensaver fallback to gen status if no keys pressed for a minute?
+    3. Add a screen-lock
 
 '''
 
@@ -49,7 +50,7 @@ import socket
 import types
 import re
 
-__version__ = "0.11 (alpha)"
+__version__ = "0.12 (alpha)"
 __author__  = "wifinigel@gmail.com"
 
 ############################
@@ -102,7 +103,6 @@ fontb24   = ImageFont.truetype('DejaVuSansMono-Bold.ttf', 24);
 #######################################
 # Initialize various global variables
 #######################################
-is_menu_shown = True          # True when menu currently shown on display
 shutdown_in_progress = False  # True when shutdown or reboot started
 screen_cleared = False        # True when display cleared (e.g. screen save)
 current_menu_location = [0]   # Pointer to current location in menu structure
@@ -112,9 +112,9 @@ home_page_name = "Home"       # Display name for top level menu
 current_mode = "classic"      # Currently selected mode (e.g. wconsole/classic)
 nav_bar_top = 55              # top pixel of nav bar
 current_scroll_selection = 0  # where we currently are in scrolling table
-table_displayed = False       # True if we're currently in a table
 table_list_length = 0         # Total length of currently displayed table
 result_cache = False          # used to cache results when paging info
+display_state = 'menu'        # current display state: 'page' or 'menu'
 
 #######################################
 # Initialize file variables
@@ -192,7 +192,7 @@ def display_dialog_msg(msg_list, back_button_req=0):
     global draw
     global oled
     global drawing_in_progress
-    global is_menu_shown
+    global display_state
     
     drawing_in_progress = True
     
@@ -212,7 +212,7 @@ def display_dialog_msg(msg_list, back_button_req=0):
     
     oled.drawImage(image)
     
-    is_menu_shown = False
+    display_state = 'page'
     drawing_in_progress = False
     
     return True
@@ -228,13 +228,12 @@ def display_simple_table(item_list, back_button_req=0, title=''):
     global drawing_in_progress
     global draw
     global oled
-    global is_menu_shown
     global current_scroll_selection
-    global table_displayed
     global table_list_length
+    global display_state
 
     drawing_in_progress = True
-    table_displayed = True
+    display_state = 'page'
     
     # Clear display prior to painting new item
     clear_display()
@@ -288,7 +287,7 @@ def display_simple_table(item_list, back_button_req=0, title=''):
     
     oled.drawImage(image)
     
-    is_menu_shown = False
+    display_state = 'page'
     drawing_in_progress = False
     
     return
@@ -315,13 +314,12 @@ def display_paged_table(table_data, back_button_req=0):
     global drawing_in_progress
     global draw
     global oled
-    global is_menu_shown
     global current_scroll_selection
-    global table_displayed
     global table_list_length
+    global display_state
 
     drawing_in_progress = True
-    table_displayed = True
+    display_state = 'page'
     
     # Clear display prior to painting new item
     clear_display()
@@ -387,7 +385,7 @@ def display_paged_table(table_data, back_button_req=0):
     
     oled.drawImage(image)
     
-    is_menu_shown = False
+    display_state = 'page'
     drawing_in_progress = False
     
     return
@@ -437,11 +435,11 @@ def draw_page():
     global height
     global pageSleepCountdown
     global current_menu_location
-    global is_menu_shown
     global option_selected 
     global option_number_selected
     global menu
     global home_page_name
+    global display_state
     
     # Drawing already in progress - return
     if drawing_in_progress:
@@ -586,7 +584,7 @@ def show_summary():
     global height
     global draw
     global oled
-    global is_menu_shown
+    global display_state
          
     IPAddress = get_ip()
     cmd = "top -bn1 | grep load | awk '{printf \"CPU Load: %.2f\", $(NF-2)}'"
@@ -616,9 +614,7 @@ def show_summary():
 def show_date():
 
     ''' 
-    Date page - taken from original bakebit script
-    
-    FIXME: Add in timezone
+    Date page - taken from original bakebit script & modified to add TZ
     
     '''
 
@@ -626,7 +622,7 @@ def show_date():
     global height
     global draw
     global oled
-    global is_menu_shown
+    global display_state
     
     drawing_in_progress = True
     
@@ -634,18 +630,21 @@ def show_date():
     clear_display()
 
     text = time.strftime("%A")
-    draw.text((1,2),text,font=font14,fill=255)
+    draw.text((1,0),text,font=font12,fill=255)
     text = time.strftime("%e %b %Y")
-    draw.text((1,17),text,font=font14,fill=255)
+    draw.text((1,13),text,font=font12,fill=255)
     text = time.strftime("%X")
-    draw.text((1,30),text,font=fontb24,fill=255)
+    draw.text((1,26),text,font=fontb14,fill=255)
+    text = time.strftime("%Z")
+    draw.text((1,41),"TZ: " + text,font=font12,fill=255)
+    
     
     # Back button
     back_button()
         
     oled.drawImage(image)
     
-    is_menu_shown = False
+    display_state = 'page'
     drawing_in_progress = False
 
 def show_interfaces():
@@ -827,6 +826,7 @@ def show_ufw():
     '''
     global ufw_file
     global result_cache
+    global display_state
     
     ufw_info = []
     
@@ -835,7 +835,7 @@ def show_ufw():
         
         display_dialog_msg(['UFW not', 'installed'], back_button_req=1)
         
-        is_menu_shown = False
+        display_state = 'page'
         return
     
     # If no cached ufw data from previous screen paint, run ufw status
@@ -926,13 +926,14 @@ def wconsole_switcher():
     global screen_cleared
     global current_mode
     global wconsole_switcher_file
+    global display_state
     
     # check wconsole is available
     if not os.path.isfile(wconsole_switcher_file):
         
         display_dialog_msg(['Wconsole not', 'available'], back_button_req=1)
         
-        is_menu_shown = False
+        display_state = 'page'
         return
     
     # wconsole switcher was detected, so assume it's installed
@@ -966,17 +967,16 @@ def menu_down():
 
     global current_menu_location
     global menu
-    global is_menu_shown
-    global table_displayed
     global current_scroll_selection
+    global display_state
     
     # If we are in a table, scroll down (unless at bottom of list)
-    if table_displayed:
+    if display_state == 'page':
         current_scroll_selection +=1
         return
     
     # Menu not currently shown, do nothing
-    if is_menu_shown == False:
+    if display_state != 'menu':
         return
 
     # pop the last menu list item, increment & push back on
@@ -993,12 +993,11 @@ def menu_right():
     global menu
     global option_number_selected
     global option_selected
-    global is_menu_shown
-    global table_displayed
     global current_scroll_selection
+    global display_state
     
     # If we are in a table, scroll up (unless at top of list)
-    if table_displayed:
+    if display_state == 'page':
         if current_scroll_selection == 0:
             return
         else:
@@ -1014,7 +1013,7 @@ def menu_right():
         draw_page()
     elif (isinstance(option_selected, types.FunctionType)):
     # if we have a function (dispatcher), execute it
-        is_menu_shown = False
+        display_state = 'page'
         option_selected()
 
 def menu_left():
@@ -1023,24 +1022,23 @@ def menu_left():
     global menu
     global option_number_selected
     global option_selected
-    global is_menu_shown
-    global table_displayed
     global current_scroll_selection
     global table_list_length
     global result_cache
+    global display_state
     
     # If we're in a table we need to exit, reset table scroll counters, reset
     # resut cache and draw the menu for our current level
-    if table_displayed:
+    if display_state == 'page':
         current_scroll_selection = 0
         table_list_length = 0
-        table_displayed = False
-        is_menu_shown = True
+        display_state = 'menu'
+        display_state = 'menu'
         draw_page()
         result_cache = False
         return
 
-    if is_menu_shown:
+    if display_state == 'menu':
 
         # check to make sure we aren't at top of menu structure
         if len(current_menu_location) == 1:
@@ -1049,17 +1047,17 @@ def menu_left():
             current_menu_location.pop()
             draw_page()
     else:
-        is_menu_shown = True
+        display_state = 'menu'
         draw_page()
 
 def go_up():
 
-    # executed when the '..' navigation item is selected
+    # executed when the back navigation item is selected
 
     global current_menu_location
-    global is_menu_shown
+    global display_state
     
-    is_menu_shown = True
+    display_state = 'menu'
     
     if len(current_menu_location) == 1:
         # we must be at top level, do nothing
@@ -1241,7 +1239,7 @@ while True:
             continue
         
         # Draw a menu or execute current action (dispatcher)
-        if is_menu_shown == False:
+        if display_state != 'menu':
             # no menu shown, so must be executing action. 
             # Re-run current action to refresh screen 
             option_selected()
@@ -1264,3 +1262,12 @@ while True:
         break
     except IOError:
         print ("Error")
+
+'''
+Discounted ideas
+
+    1. Vary sleep timer for main while loop (e.g. longer for less frequently
+       updating data) - doesn;t work as main while loop may be in middle of 
+       long sleep when button action taken, so screen refresh very long.
+
+'''
