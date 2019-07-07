@@ -52,7 +52,7 @@ import socket
 import types
 import re
 
-__version__ = "0.13 (alpha)"
+__version__ = "0.13 (beta)"
 __author__  = "wifinigel@gmail.com"
 
 ############################
