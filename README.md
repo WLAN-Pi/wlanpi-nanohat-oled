@@ -7,7 +7,7 @@ The project is currently a single Python script that has been created using the 
 
 ## Status
 
-This project is still in an early development cycle, so code is likely to change (and break) often.
+This project is now ready for beta tetsting. No further significant changes are anticipated in the short term.
 
 ## Installation
 
