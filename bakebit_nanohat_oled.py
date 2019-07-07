@@ -29,6 +29,8 @@ History:
  0.12 - Replaced 'is_menu_shown' and 'table_displayed' with single 'display state'
         variable 
         Added timezone to date page (06/07/19)
+ 0.13   Added early screen lock to show_summary() as causes some display issues
+        due to length of time external commands take to execute
 
 To do:
     1. Error handling to log?
@@ -50,7 +52,7 @@ import socket
 import types
 import re
 
-__version__ = "0.12 (alpha)"
+__version__ = "0.13 (alpha)"
 __author__  = "wifinigel@gmail.com"
 
 ############################
@@ -585,6 +587,10 @@ def show_summary():
     global draw
     global oled
     global display_state
+    
+    # The commands here take quite a while to execute, so lock screen early
+    # (normally done by page drawing function)
+    drawing_in_progress = True
          
     IPAddress = get_ip()
     cmd = "top -bn1 | grep load | awk '{printf \"CPU Load: %.2f\", $(NF-2)}'"
