@@ -30,7 +30,9 @@ History:
         variable 
         Added timezone to date page (06/07/19)
  0.13   Added early screen lock to show_summary() as causes some display issues
-        due to length of time external commands take to execute
+        due to length of time external commands take to execute (07/06/19)
+ 0.14   Added checks in dispatchers that run external commands to see if 
+        a button has been pressed before rendering page (08/07/19)
 
 To do:
     1. Error handling to log?
@@ -613,6 +615,10 @@ def show_summary():
         tempStr
     ]
     
+    # final check no-one pressed a button before we render page
+    if display_state == 'menu':
+        return
+    
     display_simple_table(results, back_button_req=1)
     
     return
@@ -661,6 +667,7 @@ def show_interfaces():
 
     global ifconfig_file
     global iw_file
+    global display_state
 
     try:
         ifconfig_info = subprocess.check_output(ifconfig_file, shell=True)
@@ -701,6 +708,10 @@ def show_interfaces():
             
             interfaces.append( '{}: {}'.format(interface_name, ip_address))
 
+    # final check no-one pressed a button before we render page
+    if display_state == 'menu':
+        return
+
     display_list_as_paged_table(interfaces, back_button_req=1, title="--Interfaces--")
 
 def show_wlan_interfaces():
@@ -711,6 +722,7 @@ def show_wlan_interfaces():
     
     global ifconfig_file
     global iw_file
+    global display_state
 
     try:
         ifconfig_info = subprocess.check_output('{} -s'.format(ifconfig_file), shell=True)
@@ -789,6 +801,10 @@ def show_wlan_interfaces():
         'pages': interfaces
     }    
 
+    # final check no-one pressed a button before we render page
+    if display_state == 'menu':
+        return
+
     display_paged_table(data, back_button_req=1)
 
 def show_usb():
@@ -796,6 +812,7 @@ def show_usb():
     '''
     Return a list of non-Linux USB interfaces found with the lsusb command
     '''
+    global display_state
 
     lsusb = '/usr/bin/lsusb | /bin/grep -v Linux | /usr/bin/cut -d\  -f7-'
     lsusb_info = []
@@ -820,6 +837,10 @@ def show_usb():
         
     if len(interfaces) == 0:
         interfaces.append("No devices detected")
+    
+    # final check no-one pressed a button before we render page
+    if display_state == 'menu':
+        return
     
     display_simple_table(interfaces, back_button_req=1, title='--USB Interfaces--')
     
@@ -881,7 +902,10 @@ def show_ufw():
     if len(port_entries) == 0:
         port_entries.append("No ufw info detected")
     
-    #display_simple_table(port_entries, back_button_req=1, title='--UFW Summary--')
+    # final check no-one pressed a button before we render page
+    if display_state == 'menu':
+        return
+    
     display_list_as_paged_table(port_entries, back_button_req=1, title='--UFW Summary--')
     
     return
