@@ -33,11 +33,14 @@ History:
         due to length of time external commands take to execute (07/06/19)
  0.14   Added checks in dispatchers that run external commands to see if 
         a button has been pressed before rendering page (08/07/19)
+ 0.15   Change "wconsole" to "Wi-Fi Console" mode (09/07/19)
 
 To do:
     1. Error handling to log?
     2. Add screensaver fallback to gen status if no keys pressed for a minute?
     3. Add a screen-lock
+    4. Cure the ills of the world, lose some weight and adopt a frog called 
+       Malcolm
 
 '''
 
@@ -519,7 +522,7 @@ def draw_page():
         # otherwise show the name of the parent menu item
         page_name = section_name[-2]
         
-    page_title = ("[  " + page_name + "  ]").center(17, " ")
+    page_title = ("[ " + page_name + " ]").center(17, " ")
     
     # Clear display prior to painting new item
     clear_display()
@@ -857,7 +860,7 @@ def show_ufw():
     
     ufw_info = []
     
-    # check wconsole is available
+    # check ufw is available
     if not os.path.isfile(ufw_file):
         
         display_dialog_msg(['UFW not', 'installed'], back_button_req=1)
@@ -958,15 +961,15 @@ def wconsole_switcher():
     global wconsole_switcher_file
     global display_state
     
-    # check wconsole is available
+    # check wi-fi console is available
     if not os.path.isfile(wconsole_switcher_file):
         
-        display_dialog_msg(['Wconsole not', 'available'], back_button_req=1)
+        display_dialog_msg(['Wi-Fi Console', 'not available'], back_button_req=1)
         
         display_state = 'page'
         return
     
-    # wconsole switcher was detected, so assume it's installed
+    # Wi-Fi Console switcher was detected, so assume it's installed
     
     display_dialog_msg(['Booting...', '(new mode)'], back_button_req=0)
     time.sleep(1)
@@ -975,12 +978,12 @@ def wconsole_switcher():
     
     
     if current_mode == "classic":
-        # if in classic mode, switch to wconsole
+        # if in classic mode, switch to Wi-Fi Console
         subprocess.call("{} on".format(wconsole_switcher_file), shell=True)
     elif current_mode == "wconsole":
         subprocess.call("{} off".format(wconsole_switcher_file), shell=True)
     else:
-        print "Hit unknown mode in wconsole switcher"
+        print "Hit unknown mode in Wi-Fi Console switcher"
         return
         
     drawing_in_progress = False
@@ -1133,8 +1136,8 @@ if current_mode == "wconsole":
         },            
     ]
     
-    # Ensure home menu title shows we are in wconsole mode
-    home_page_name = "Wconsole"
+    # Ensure home menu title shows we are in Wi-Fi Console mode
+    home_page_name = "Wi-Fi Console"
     
 else:
     # assume classic mode
@@ -1158,7 +1161,7 @@ else:
                     { "name": "Confirm", "action": reboot},
                     ]
                 },
-                { "name": "2.Wconsole Mode",   "action": [
+                { "name": "2.W-Console Mode",   "action": [
                     { "name": "Cancel", "action": go_up},
                     { "name": "Confirm", "action": wconsole_switcher},
                     ]
