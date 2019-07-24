@@ -34,13 +34,15 @@ History:
  0.14   Added checks in dispatchers that run external commands to see if 
         a button has been pressed before rendering page (08/07/19)
  0.15   Change "wconsole" to "Wi-Fi Console" mode (09/07/19)
+ 0.16   Added home page on boot-up.
+        Improved mode switch dialogs
+        Added more try statements to improve system calls robustness
+        Simplified menu data structure for mode switch consistency (24/07/19)
 
 To do:
     1. Error handling to log?
     2. Add screensaver fallback to gen status if no keys pressed for a minute?
-    3. Add a screen-lock
-    4. Cure the ills of the world, lose some weight and adopt a frog called 
-       Malcolm
+    3. Add a screen-lock ?
 
 '''
 
@@ -57,7 +59,7 @@ import socket
 import types
 import re
 
-__version__ = "0.13 (beta)"
+__version__ = "0.16 (beta)"
 __author__  = "wifinigel@gmail.com"
 
 ############################
@@ -121,7 +123,8 @@ nav_bar_top = 55              # top pixel of nav bar
 current_scroll_selection = 0  # where we currently are in scrolling table
 table_list_length = 0         # Total length of currently displayed table
 result_cache = False          # used to cache results when paging info
-display_state = 'menu'        # current display state: 'page' or 'menu'
+display_state = 'page'        # current display state: 'page' or 'menu'
+start_up = True
 
 #######################################
 # Initialize file variables
@@ -136,7 +139,20 @@ ufw_file = '/usr/sbin/ufw'
 # check our current mode
 if os.path.isfile(wconsole_mode_file):
     current_mode = 'wconsole'
+    
 
+# get & the current version of WLANPi image
+ver_cmd = "grep \"WLAN Pi v\" /var/www/html/index.html | sed \"s/<[^>]\+>//g\""
+try:
+    wlanpi_ver = subprocess.check_output(ver_cmd, shell = True )
+except:
+    wlanpi_ver = "unknown"
+
+# get hostname
+try:   
+    hostname = subprocess.check_output('hostname', shell = True)
+except:
+    hostname = "unknown"
 
 #############################
 # Get current IP for display
@@ -598,13 +614,33 @@ def show_summary():
     drawing_in_progress = True
          
     IPAddress = get_ip()
+    
+    # determine CPU load
     cmd = "top -bn1 | grep load | awk '{printf \"CPU Load: %.2f\", $(NF-2)}'"
-    CPU = subprocess.check_output(cmd, shell = True )
+    try:
+        CPU = subprocess.check_output(cmd, shell = True )
+    except:
+        CPU = "unknown"
+        
+    #determine mem useage
     cmd = "free -m | awk 'NR==2{printf \"Mem: %s/%sMB %.2f%%\", $3,$2,$3*100/$2 }'"
-    MemUsage = subprocess.check_output(cmd, shell = True )
+    try:
+        MemUsage = subprocess.check_output(cmd, shell = True )
+    except:
+        MemUsage = "unknown"
+    
+    # determine disk util
     cmd = "df -h | awk '$NF==\"/\"{printf \"Disk: %d/%dGB %s\", $3,$2,$5}'"
-    Disk = subprocess.check_output(cmd, shell = True )
-    tempI = int(open('/sys/class/thermal/thermal_zone0/temp').read());
+    try:
+        Disk = subprocess.check_output(cmd, shell = True )
+    except:
+        Disk = "unknown"
+        
+    # determine temp
+    try:
+        tempI = int(open('/sys/class/thermal/thermal_zone0/temp').read())
+    except:
+        tempI = "unknown"
     
     if tempI>1000:
         tempI = tempI/1000
@@ -702,10 +738,13 @@ def show_interfaces():
                 if (re.search("wlan\d", interface_name, re.MULTILINE)):
 
                     # fire up 'iw' for this interface (hmmm..is this a bit of an un-necessary ovehead?)
-                    iw_info = subprocess.check_output('{} {} info'.format(iw_file, interface_name), shell=True)
+                    try:
+                        iw_info = subprocess.check_output('{} {} info'.format(iw_file, interface_name), shell=True)
 
-                    if re.search("type monitor", iw_info, re.MULTILINE):
-                        ip_address = "(Mon mode)"           
+                        if re.search("type monitor", iw_info, re.MULTILINE):
+                            ip_address = "(Monitor)"
+                    except:
+                        ip_address = "unknown"
             else:
                 ip_address = inet_search.group(1)
             
@@ -746,7 +785,10 @@ def show_wlan_interfaces():
             interface_info = []
             
             # use iw to find further info for each wlan interface
-            iw_info = subprocess.check_output("{} {} info".format(iw_file, interface_name), shell=True)
+            try:
+                iw_info = subprocess.check_output("{} {} info".format(iw_file, interface_name), shell=True)
+            except:
+                iw_info = "Err: iw cmd failed"
             
             # split the output in to an array
             iw_list = iw_info.split('\n')
@@ -965,32 +1007,87 @@ def wconsole_switcher():
     if not os.path.isfile(wconsole_switcher_file):
         
         display_dialog_msg(['Wi-Fi Console', 'not available'], back_button_req=1)
-        
         display_state = 'page'
         return
     
     # Wi-Fi Console switcher was detected, so assume it's installed
     
-    display_dialog_msg(['Booting...', '(new mode)'], back_button_req=0)
-    time.sleep(1)
-    oled.clearDisplay()
-    screen_cleared = True
-    
+    back_button_req=0
     
     if current_mode == "classic":
         # if in classic mode, switch to Wi-Fi Console
-        subprocess.call("{} on".format(wconsole_switcher_file), shell=True)
+        dialog_msg = ['Switching to', 'Wi-Fi console', 'mode', "(rebooting...)"]
+        switch = "on"
     elif current_mode == "wconsole":
-        subprocess.call("{} off".format(wconsole_switcher_file), shell=True)
+        dialog_msg = ['Switching to', 'Classic', 'mode', "(rebooting...)"]
+        switch = "off"
     else:
-        print "Hit unknown mode in Wi-Fi Console switcher"
-        return
-        
-    drawing_in_progress = False
+        dialog_msg(['Unknown mode:', current_mode], back_button_req=1)
+        display_state = 'page'
+        return False
     
-    os.system('systemctl reboot')
-    shutdown_in_progress = True
-    return
+    # Flip the mode    
+    try:
+        display_dialog_msg(dialog_msg, back_button_req)
+        shutdown_in_progress = True
+        time.sleep(2)
+        oled.clearDisplay()
+        screen_cleared = True
+
+        subprocess.call("{} {}".format(wconsole_switcher_file, switch), shell=True) # reboots
+    except Exception as ex:
+        dialog_msg = ['Switch failed!', str(ex)]
+        back_button_req=1
+    
+    # We only get to this point if the switch has failed for some reason
+    # (Note that the switcher script reboots the WLANPi)
+    display_dialog_msg(dialog_msg, back_button_req)
+
+    time.sleep(1)
+    
+    display_state = 'page'
+    return True
+
+def home_page():
+
+    global draw
+    global oled
+    global wlanpi_ver
+    global current_mode
+    global hostname
+    global drawing_in_progress
+    global display_state
+    
+    drawing_in_progress = True
+    display_state = 'page'
+
+    if current_mode == "wconsole":
+    
+        # get wlan0 IP
+        if_name = "wlan0"
+        
+    else:
+
+        # get eth0 IP
+        if_name = "eth0"
+    
+    ip_addr_cmd = "ip addr show {} | grep -Po \'inet \K[\d.]+\'".format(if_name) 
+
+    try:
+        ip_addr = subprocess.check_output(ip_addr_cmd, shell=True)
+    except Exception as ex:
+        ip_addr = "No IP Addr"
+    
+    clear_display()
+    draw.text((0,1),str(wlanpi_ver),font=smartFont,fill=255)
+    draw.text((0,11),str(hostname),font=font11,fill=255)
+    draw.text((95,20),if_name,font=smartFont,fill=255)
+    draw.text((0,29),str(ip_addr),font=font14,fill=255)
+    back_button('Menu')
+    oled.drawImage(image)
+    
+    drawing_in_progress = False
+    return 
 
 #######################
 # other functions here
@@ -1061,7 +1158,7 @@ def menu_left():
     global display_state
     
     # If we're in a table we need to exit, reset table scroll counters, reset
-    # resut cache and draw the menu for our current level
+    # result cache and draw the menu for our current level
     if display_state == 'page':
         current_scroll_selection = 0
         table_list_length = 0
@@ -1106,76 +1203,52 @@ def go_up():
 #######################
 # menu structure here
 #######################
+
+# assume classic mode menu initially...
+menu = [
+      { "name": "1.Network", "action": [
+            { "name": "1.Interfaces", "action": show_interfaces},
+            { "name": "2.WLAN Interfaces", "action": show_wlan_interfaces},
+            { "name": "3.USB Devices", "action": show_usb},
+            { "name": "4.UFW Ports", "action": show_ufw},
+        ]
+      },
+      { "name": "2.Status", "action": [
+            { "name": "1.Summary", "action": show_summary},
+            { "name": "2.Date/Time", "action": show_date},
+            { "name": "3.Version", "action": show_menu_ver},
+        ]
+      },
+      { "name": "3.Home Page", "action": home_page },
+      { "name": "4.Actions", "action": [
+            { "name": "1.W-Console",   "action": [
+                { "name": "Cancel", "action": go_up},
+                { "name": "Confirm", "action": wconsole_switcher},
+                ]
+            },
+            { "name": "2.Reboot",   "action": [
+                { "name": "Cancel", "action": go_up},
+                { "name": "Confirm", "action": reboot},
+                ]
+            },
+            { "name": "3.Shutdown", "action": [
+                { "name": "Cancel", "action": go_up},
+                { "name": "Confirm", "action": shutdown},
+                ]
+            },
+        ]
+      }
+]
+
+# update menu options data structure if we're in wi-fi console mode    
 if current_mode == "wconsole":
+    menu[3]["action"][0] = { "name": "1.Classic Mode",   "action": [
+                            { "name": "Cancel", "action": go_up},
+                            { "name": "Confirm", "action": wconsole_switcher},
+                            ]
+                        }
 
-    menu = [
-        { "name": "1.Network", "action": [
-                { "name": "1.Interfaces", "action": show_interfaces},
-                { "name": "2.WLAN Interfaces", "action": show_wlan_interfaces},
-                { "name": "3.USB Devices", "action": show_usb},
-                { "name": "4.UFW Ports", "action": show_ufw},
-            ]
-        },
-        { "name": "2.Status", "action": [
-                { "name": "1.Summary", "action": show_summary},
-                { "name": "2.Version", "action": show_menu_ver},
-            ]
-        },
-        { "name":"3.Actions", "action": [
-                { "name": "1.Classic Mode",   "action": [
-                    { "name": "Cancel", "action": go_up},
-                    { "name": "Confirm", "action": wconsole_switcher},
-                    ]
-                },
-                { "name": "2.Reboot",   "action": [
-                    { "name": "Cancel", "action": go_up},
-                    { "name": "Confirm", "action": reboot},
-                    ]
-                },
-            ]
-        },            
-    ]
-    
-    # Ensure home menu title shows we are in Wi-Fi Console mode
-    home_page_name = "Wi-Fi Console"
-    
-else:
-    # assume classic mode
-    menu = [
-          { "name": "1.Network", "action": [
-                { "name": "1.Interfaces", "action": show_interfaces},
-                { "name": "2.WLAN Interfaces", "action": show_wlan_interfaces},
-                { "name": "3.USB Devices", "action": show_usb},
-                { "name": "4.UFW Ports", "action": show_ufw},
-            ]
-          },
-          { "name": "2.Status", "action": [
-                { "name": "1.Summary", "action": show_summary},
-                { "name": "2.Date/Time", "action": show_date},
-                { "name": "3.Version", "action": show_menu_ver},
-            ]
-          },
-          { "name":"3.Actions", "action": [
-                { "name": "1.Reboot",   "action": [
-                    { "name": "Cancel", "action": go_up},
-                    { "name": "Confirm", "action": reboot},
-                    ]
-                },
-                { "name": "2.W-Console Mode",   "action": [
-                    { "name": "Cancel", "action": go_up},
-                    { "name": "Confirm", "action": wconsole_switcher},
-                    ]
-                },
-                { "name": "3.Shutdown", "action": [
-                    { "name": "Cancel", "action": go_up},
-                    { "name": "Confirm", "action": shutdown},
-                    ]
-                },
-            ]
-          }
-    ]
-
-# Set up handlers to process key pressses
+# Set up handlers to process key presses
 def receive_signal(signum, stack):
 
     global pageSleepCountdown
@@ -1184,6 +1257,7 @@ def receive_signal(signum, stack):
     global shutdown_in_progress
     global screen_cleared
     global sig_fired
+    global start_up
 
     if (sig_fired):
         # signal handler already in progress, ignore this one
@@ -1191,6 +1265,8 @@ def receive_signal(signum, stack):
 
     #user pressed a button, reset the sleep counter
     pageSleepCountdown = pageSleep 
+    
+    start_up = False
     
     if drawing_in_progress or shutdown_in_progress:
         return
@@ -1274,7 +1350,12 @@ while True:
         # Draw a menu or execute current action (dispatcher)
         if display_state != 'menu':
             # no menu shown, so must be executing action. 
-            # Re-run current action to refresh screen 
+            
+            # if we've just booted up, show home page
+            if start_up == True:
+                option_selected = home_page
+            
+             # Re-run current action to refresh screen
             option_selected()
         else:
             # lets try drawing our page (or refresh if already painted)
