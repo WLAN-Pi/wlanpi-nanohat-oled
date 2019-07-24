@@ -13,6 +13,14 @@ This project is now ready for beta tetsting. No further significant changes are 
 
 If you would like to have a look at the current menu system on your WLANPi, download the "bakebit_nanohat_oled.py" file from this project and copy it to your WLANPi directory "/home/wlanpi/NanoHatOLED/BakeBit/Software/Python". It's probably a good idea to make a backup of you existing "bakebit_nanohat_oled.py" before copying in the new file.
 
+Once the file is in position check that the file is owned by the root user and is executable by root. The following commands should do the trick:
+
+```
+ cd /home/wlanpi/NanoHatOLED/BakeBit/Software/Python/
+ sudo chown root:root bakebit_nanohat_oled.py
+ sudo chmod 755 bakebit_nanohat_oled.py
+```
+
 Once the file is installed, reboot the WLANPi and the new menu system should be visible on the OLED display.
 
 ![WLANPi Menu](https://github.com/WLAN-Pi/wlanpi-nanohat-oled/blob/master/images/wlanpi_menu.jpg)
