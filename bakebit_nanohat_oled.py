@@ -38,6 +38,9 @@ History:
         Improved mode switch dialogs
         Added more try statements to improve system calls robustness
         Simplified menu data structure for mode switch consistency (24/07/19)
+ 0.17   Fixed bug with wireless console title missing
+        Added Wi-Fi hotspot mode
+        Added mode indicator on home page
 
 To do:
     1. Error handling to log?
@@ -59,7 +62,7 @@ import socket
 import types
 import re
 
-__version__ = "0.16 (beta)"
+__version__ = "0.17 (beta)"
 __author__  = "wifinigel@gmail.com"
 
 ############################
@@ -88,7 +91,7 @@ oled.setHorizontalMode()
 
 # This variable is shared between activities and is set to True if a
 # drawing action in already if progress (e.g. by another activity). An activity
-# happens during each cycle of the main while loop or when a buttton is pressed
+# happens during each cycle of the main while loop or when a button is pressed
 # (This does not appear to be threading or process spawning)
 drawing_in_progress = False
 
@@ -130,7 +133,9 @@ start_up = True
 # Initialize file variables
 #######################################
 wconsole_mode_file = '/etc/wconsole/wconsole.on'
+hotspot_mode_file = '/etc/wlanpihotspot/hotspot.on'
 wconsole_switcher_file = '/etc/wconsole/wconsole_switcher'
+hotspot_switcher_file = '/etc/wlanpihotspot/hotspot_switcher'
 ifconfig_file = '/sbin/ifconfig'
 iw_file = '/usr/sbin/iw'
 ufw_file = '/usr/sbin/ufw'
@@ -139,6 +144,8 @@ ufw_file = '/usr/sbin/ufw'
 # check our current mode
 if os.path.isfile(wconsole_mode_file):
     current_mode = 'wconsole'
+if os.path.isfile(hotspot_mode_file):
+    current_mode = 'hotspot'
     
 
 # get & the current version of WLANPi image
@@ -994,31 +1001,29 @@ def reboot():
     shutdown_in_progress = True
     return
 
-def wconsole_switcher():
+def switcher(resource_title, resource_switcher_file, mode_name):
 
     global oled
     global shutdown_in_progress
     global screen_cleared
     global current_mode
-    global wconsole_switcher_file
     global display_state
     
-    # check wi-fi console is available
-    if not os.path.isfile(wconsole_switcher_file):
+    # check resource is available
+    if not os.path.isfile(resource_switcher_file):
         
-        display_dialog_msg(['Wi-Fi Console', 'not available'], back_button_req=1)
+        display_dialog_msg([resource_title, 'not available'], back_button_req=1)
         display_state = 'page'
         return
     
-    # Wi-Fi Console switcher was detected, so assume it's installed
-    
+    # Resource switcher was detected, so assume it's installed    
     back_button_req=0
     
     if current_mode == "classic":
-        # if in classic mode, switch to Wi-Fi Console
-        dialog_msg = ['Switching to', 'Wi-Fi console', 'mode', "(rebooting...)"]
+        # if in classic mode, switch to the resource
+        dialog_msg = ['Switching to', resource_title, 'mode', "(rebooting...)"]
         switch = "on"
-    elif current_mode == "wconsole":
+    elif current_mode == mode_name:
         dialog_msg = ['Switching to', 'Classic', 'mode', "(rebooting...)"]
         switch = "off"
     else:
@@ -1034,7 +1039,7 @@ def wconsole_switcher():
         oled.clearDisplay()
         screen_cleared = True
 
-        subprocess.call("{} {}".format(wconsole_switcher_file, switch), shell=True) # reboots
+        subprocess.call("{} {}".format(resource_switcher_file, switch), shell=True) # reboots
     except Exception as ex:
         dialog_msg = ['Switch failed!', str(ex)]
         back_button_req=1
@@ -1046,6 +1051,29 @@ def wconsole_switcher():
     time.sleep(1)
     
     display_state = 'page'
+    return True
+
+def wconsole_switcher():
+
+    global wconsole_switcher_file
+    
+    resource_title = "Wi-Fi Console"
+    mode_name = "wconsole"
+    resource_switcher_file = wconsole_switcher_file
+    
+    # switch
+    switcher(resource_title, resource_switcher_file, mode_name)
+    return True
+
+def hotspot_switcher():
+
+    global hotspot_switcher_file
+  
+    resource_title = "Hotspot"
+    mode_name = "hotspot"
+    resource_switcher_file = hotspot_switcher_file
+    
+    switcher(resource_title, resource_switcher_file, mode_name)
     return True
 
 def home_page():
@@ -1062,14 +1090,20 @@ def home_page():
     display_state = 'page'
 
     if current_mode == "wconsole":
-    
         # get wlan0 IP
         if_name = "wlan0"
-        
+        mode_name = "Wi-Fi Console"
+    
+    elif current_mode == "hotspot":
+        # get wlan0 IP
+        if_name = "wlan0"
+        mode_name = "Hotspot"
+    
     else:
 
         # get eth0 IP
         if_name = "eth0"
+        mode_name = ""
     
     ip_addr_cmd = "ip addr show {} | grep -Po \'inet \K[\d.]+\'".format(if_name) 
 
@@ -1083,6 +1117,7 @@ def home_page():
     draw.text((0,11),str(hostname),font=font11,fill=255)
     draw.text((95,20),if_name,font=smartFont,fill=255)
     draw.text((0,29),str(ip_addr),font=font14,fill=255)
+    draw.text((0,43),str(mode_name),font=smartFont,fill=255)
     back_button('Menu')
     oled.drawImage(image)
     
@@ -1226,12 +1261,17 @@ menu = [
                 { "name": "Confirm", "action": wconsole_switcher},
                 ]
             },
-            { "name": "2.Reboot",   "action": [
+            { "name": "2.Hotspot",   "action": [
+                { "name": "Cancel", "action": go_up},
+                { "name": "Confirm", "action": hotspot_switcher},
+                ]
+            },
+            { "name": "3.Reboot",   "action": [
                 { "name": "Cancel", "action": go_up},
                 { "name": "Confirm", "action": reboot},
                 ]
             },
-            { "name": "3.Shutdown", "action": [
+            { "name": "4.Shutdown", "action": [
                 { "name": "Cancel", "action": go_up},
                 { "name": "Confirm", "action": shutdown},
                 ]
@@ -1240,13 +1280,29 @@ menu = [
       }
 ]
 
-# update menu options data structure if we're in wi-fi console mode    
+# update menu options data structure if we're in non-classic mode    
 if current_mode == "wconsole":
-    menu[3]["action"][0] = { "name": "1.Classic Mode",   "action": [
-                            { "name": "Cancel", "action": go_up},
-                            { "name": "Confirm", "action": wconsole_switcher},
-                            ]
-                        }
+    switcher_dispatcher = wconsole_switcher
+    home_page_name = "Wi-Fi Console"
+
+if current_mode == "hotspot":
+    switcher_dispatcher = hotspot_switcher
+    home_page_name = "Hotspot"
+
+if current_mode != "classic":
+    menu[3] = { "name": "4.Actions", "action": [
+                { "name": "1.Classic Mode",   "action": [
+                    { "name": "Cancel", "action": go_up},
+                    { "name": "Confirm", "action": switcher_dispatcher},
+                    ]
+                },
+                { "name": "2.Reboot",   "action": [
+                    { "name": "Cancel", "action": go_up},
+                    { "name": "Confirm", "action": reboot},
+                    ]
+                },
+            ]
+          }
 
 # Set up handlers to process key presses
 def receive_signal(signum, stack):
