@@ -40,7 +40,8 @@ History:
         Simplified menu data structure for mode switch consistency (24/07/19)
  0.17   Fixed bug with wireless console title missing
         Added Wi-Fi hotspot mode
-        Added mode indicator on home page
+        Added mode indicator on home page (26/07/19)
+ 0.18   Added exit to home page option from top of menu (27/07/19)
 
 To do:
     1. Error handling to log?
@@ -62,7 +63,7 @@ import socket
 import types
 import re
 
-__version__ = "0.17 (beta)"
+__version__ = "0.18 (beta)"
 __author__  = "wifinigel@gmail.com"
 
 ############################
@@ -127,7 +128,7 @@ current_scroll_selection = 0  # where we currently are in scrolling table
 table_list_length = 0         # Total length of currently displayed table
 result_cache = False          # used to cache results when paging info
 display_state = 'page'        # current display state: 'page' or 'menu'
-start_up = True
+start_up = True               # True if in initial (home page) start-up state
 
 #######################################
 # Initialize file variables
@@ -596,6 +597,8 @@ def draw_page():
     # Don't show back button at top level of menu
     if depth != 1:
         back_button()
+    else:
+        back_button(label="Exit")
     
     oled.drawImage(image)
 
@@ -1191,6 +1194,7 @@ def menu_left():
     global table_list_length
     global result_cache
     global display_state
+    global start_up
     
     # If we're in a table we need to exit, reset table scroll counters, reset
     # result cache and draw the menu for our current level
@@ -1207,7 +1211,9 @@ def menu_left():
 
         # check to make sure we aren't at top of menu structure
         if len(current_menu_location) == 1:
-            return
+            # If we're at the top and hit exit (back) button, revert to start-up state
+            start_up = True
+            home_page()
         else:
             current_menu_location.pop()
             draw_page()
@@ -1254,8 +1260,7 @@ menu = [
             { "name": "3.Version", "action": show_menu_ver},
         ]
       },
-      { "name": "3.Home Page", "action": home_page },
-      { "name": "4.Actions", "action": [
+      { "name": "3.Actions", "action": [
             { "name": "1.W-Console",   "action": [
                 { "name": "Cancel", "action": go_up},
                 { "name": "Confirm", "action": wconsole_switcher},
@@ -1290,7 +1295,7 @@ if current_mode == "hotspot":
     home_page_name = "Hotspot"
 
 if current_mode != "classic":
-    menu[3] = { "name": "4.Actions", "action": [
+    menu[2] = { "name": "3.Actions", "action": [
                 { "name": "1.Classic Mode",   "action": [
                     { "name": "Cancel", "action": go_up},
                     { "name": "Confirm", "action": switcher_dispatcher},
@@ -1387,7 +1392,7 @@ signal.signal(signal.SIGALRM, receive_signal)
 # when a button is pressed and an interrupt occurs: no additional thread or
 # interpreter with its own set of vars appears to be launched. For this reason,
 # vars may be used to signal between the main while loop and any button press
-# activitie to indicate that processes such as screen paints are in progress.
+# activity to indicate that processes such as screen paints are in progress.
 #
 # Despite the sample code suggesting threading is used I do not believe this
 # is the case, based on testing with variable scopes and checking for process
