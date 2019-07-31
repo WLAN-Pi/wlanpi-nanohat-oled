@@ -42,6 +42,7 @@ History:
         Added Wi-Fi hotspot mode
         Added mode indicator on home page (26/07/19)
  0.18   Added exit to home page option from top of menu (27/07/19)
+ 0.19   Added additional menu items to support start/stop/status of kismet (30/07/19)    
 
 To do:
     1. Error handling to log?
@@ -63,7 +64,7 @@ import socket
 import types
 import re
 
-__version__ = "0.18 (beta)"
+__version__ = "0.19 (beta)"
 __author__  = "wifinigel@gmail.com"
 
 ############################
@@ -137,6 +138,7 @@ wconsole_mode_file = '/etc/wconsole/wconsole.on'
 hotspot_mode_file = '/etc/wlanpihotspot/hotspot.on'
 wconsole_switcher_file = '/etc/wconsole/wconsole_switcher'
 hotspot_switcher_file = '/etc/wlanpihotspot/hotspot_switcher'
+kismet_switcher_file = '/etc/wlanpi-kismet/kismet_switcher'
 ifconfig_file = '/sbin/ifconfig'
 iw_file = '/usr/sbin/iw'
 ufw_file = '/usr/sbin/ufw'
@@ -1005,6 +1007,9 @@ def reboot():
     return
 
 def switcher(resource_title, resource_switcher_file, mode_name):
+    '''
+    Function to perform generic set of operations to switch wlanpi mode
+    '''
 
     global oled
     global shutdown_in_progress
@@ -1079,6 +1084,55 @@ def hotspot_switcher():
     switcher(resource_title, resource_switcher_file, mode_name)
     return True
 
+def kismet_ctl(action="status"):
+    '''
+    Function to start/stop and get status of Kismet processes
+    '''
+
+    global kismet_switcher_file
+    global display_state
+    
+    # check resource is available
+    if not os.path.isfile(kismet_switcher_file):        
+        display_dialog_msg([kismet_switcher_file, 'not available'], back_button_req=1)
+        display_state = 'page'
+        return
+
+    if action=="status":
+        # check kismet status & return text
+        try:
+            dialog_msg = subprocess.check_output("{} {}".format(kismet_switcher_file, action), shell=True).split()
+        except Exception as ex:
+            dialog_msg = ['Status failed!', str(ex)]
+        
+    elif action=="start":
+        try:
+            dialog_msg = subprocess.check_output("{} {}".format(kismet_switcher_file, action), shell=True).split()
+        except Exception as ex:
+            dialog_msg = ['Start failed!', str(ex)]
+    
+    elif action=="stop":
+        try:
+            dialog_msg = subprocess.check_output("{} {}".format(kismet_switcher_file, action), shell=True).split()
+        except Exception as ex:
+            dialog_msg = ['Stop failed!', str(ex)]
+        
+    display_dialog_msg(dialog_msg, back_button_req=1)
+    display_state = 'page'
+    return True
+
+def kismet_status():
+    kismet_ctl(action="status")
+    return
+    
+def kismet_stop():
+    kismet_ctl(action="stop")
+    return
+    
+def kismet_start():
+    kismet_ctl(action="start")
+    return
+
 def home_page():
 
     global draw
@@ -1103,7 +1157,6 @@ def home_page():
         mode_name = "Hotspot"
     
     else:
-
         # get eth0 IP
         if_name = "eth0"
         mode_name = ""
@@ -1271,12 +1324,18 @@ menu = [
                 { "name": "Confirm", "action": hotspot_switcher},
                 ]
             },
-            { "name": "3.Reboot",   "action": [
+            { "name": "3.Kismet",   "action": [
+                { "name": "Status", "action": kismet_status},
+                { "name": "Stop", "action":   kismet_stop},
+                { "name": "Start", "action":  kismet_start},
+                ]
+            },
+            { "name": "4.Reboot",   "action": [
                 { "name": "Cancel", "action": go_up},
                 { "name": "Confirm", "action": reboot},
                 ]
             },
-            { "name": "4.Shutdown", "action": [
+            { "name": "5.Shutdown", "action": [
                 { "name": "Cancel", "action": go_up},
                 { "name": "Confirm", "action": shutdown},
                 ]
