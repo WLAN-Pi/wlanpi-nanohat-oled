@@ -42,7 +42,10 @@ History:
         Added Wi-Fi hotspot mode
         Added mode indicator on home page (26/07/19)
  0.18   Added exit to home page option from top of menu (27/07/19)
- 0.19   Added additional menu items to support start/stop/status of kismet (30/07/19)    
+ 0.19   Added additional menu items to support start/stop/status of kismet (30/07/19)  
+ 0.20   Added bettercap web-ui support 
+        Moved kismet and bettercap ctl scripts to common dir structure under
+        /home/wlanpi/nanohat-oled-scripts (01/08/19) 
 
 To do:
     1. Error handling to log?
@@ -64,7 +67,7 @@ import socket
 import types
 import re
 
-__version__ = "0.19 (beta)"
+__version__ = "0.20 (beta)"
 __author__  = "wifinigel@gmail.com"
 
 ############################
@@ -134,11 +137,17 @@ start_up = True               # True if in initial (home page) start-up state
 #######################################
 # Initialize file variables
 #######################################
+# Mode changer scripts
 wconsole_mode_file = '/etc/wconsole/wconsole.on'
 hotspot_mode_file = '/etc/wlanpihotspot/hotspot.on'
 wconsole_switcher_file = '/etc/wconsole/wconsole_switcher'
 hotspot_switcher_file = '/etc/wlanpihotspot/hotspot_switcher'
-kismet_switcher_file = '/etc/wlanpi-kismet/kismet_switcher'
+
+# helper scripts to launch misc processes
+kismet_ctl_file = '/home/wlanpi/nanohat-oled-scripts/kismet_ctl'
+bettercap_ctl_file = '/home/wlanpi/nanohat-oled-scripts/bettercap_ctl'
+
+# Linux programs
 ifconfig_file = '/sbin/ifconfig'
 iw_file = '/usr/sbin/iw'
 ufw_file = '/usr/sbin/ufw'
@@ -1089,31 +1098,31 @@ def kismet_ctl(action="status"):
     Function to start/stop and get status of Kismet processes
     '''
 
-    global kismet_switcher_file
+    global kismet_ctl_file
     global display_state
     
     # check resource is available
-    if not os.path.isfile(kismet_switcher_file):        
-        display_dialog_msg([kismet_switcher_file, 'not available'], back_button_req=1)
+    if not os.path.isfile(kismet_ctl_file):        
+        display_dialog_msg([kismet_ctl_file, 'not available'], back_button_req=1)
         display_state = 'page'
         return
 
     if action=="status":
         # check kismet status & return text
         try:
-            dialog_msg = subprocess.check_output("{} {}".format(kismet_switcher_file, action), shell=True).split()
+            dialog_msg = subprocess.check_output("{} {}".format(kismet_ctl_file, action), shell=True).split()
         except Exception as ex:
             dialog_msg = ['Status failed!', str(ex)]
         
     elif action=="start":
         try:
-            dialog_msg = subprocess.check_output("{} {}".format(kismet_switcher_file, action), shell=True).split()
+            dialog_msg = subprocess.check_output("{} {}".format(kismet_ctl_file, action), shell=True).split()
         except Exception as ex:
             dialog_msg = ['Start failed!', str(ex)]
     
     elif action=="stop":
         try:
-            dialog_msg = subprocess.check_output("{} {}".format(kismet_switcher_file, action), shell=True).split()
+            dialog_msg = subprocess.check_output("{} {}".format(kismet_ctl_file, action), shell=True).split()
         except Exception as ex:
             dialog_msg = ['Stop failed!', str(ex)]
         
@@ -1131,6 +1140,56 @@ def kismet_stop():
     
 def kismet_start():
     kismet_ctl(action="start")
+    return
+
+
+def bettercap_ctl(action="status"):
+    '''
+    Function to start/stop and get status of Kismet processes
+    '''
+
+    global bettercap_ctl_file
+    global display_state
+    
+    # check resource is available
+    if not os.path.isfile(bettercap_ctl_file):        
+        display_dialog_msg([bettercap_ctl_file, 'not available'], back_button_req=1)
+        display_state = 'page'
+        return
+
+    if action=="status":
+        # check bettercap status & return text
+        try:
+            dialog_msg = subprocess.check_output("{} {}".format(bettercap_ctl_file, action), shell=True).split()
+        except Exception as ex:
+            dialog_msg = ['Status failed!', str(ex)]
+        
+    elif action=="start":
+        try:
+            dialog_msg = subprocess.check_output("{} {}".format(bettercap_ctl_file, action), shell=True).split()
+        except Exception as ex:
+            dialog_msg = ['Start failed!', str(ex)]
+    
+    elif action=="stop":
+        try:
+            dialog_msg = subprocess.check_output("{} {}".format(bettercap_ctl_file, action), shell=True).split()
+        except Exception as ex:
+            dialog_msg = ['Stop failed!', str(ex)]
+        
+    display_dialog_msg(dialog_msg, back_button_req=1)
+    display_state = 'page'
+    return True
+
+def bettercap_status():
+    bettercap_ctl(action="status")
+    return
+    
+def bettercap_stop():
+    bettercap_ctl(action="stop")
+    return
+    
+def bettercap_start():
+    bettercap_ctl(action="start")
     return
 
 def home_page():
@@ -1330,12 +1389,18 @@ menu = [
                 { "name": "Start", "action":  kismet_start},
                 ]
             },
-            { "name": "4.Reboot",   "action": [
+            { "name": "4.Bettercap",   "action": [
+                { "name": "Status", "action": bettercap_status},
+                { "name": "Stop", "action":   bettercap_stop},
+                { "name": "Start", "action":  bettercap_start},
+                ]
+            },
+            { "name": "5.Reboot",   "action": [
                 { "name": "Cancel", "action": go_up},
                 { "name": "Confirm", "action": reboot},
                 ]
             },
-            { "name": "5.Shutdown", "action": [
+            { "name": "6.Shutdown", "action": [
                 { "name": "Cancel", "action": go_up},
                 { "name": "Confirm", "action": shutdown},
                 ]
