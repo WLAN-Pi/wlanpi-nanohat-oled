@@ -45,7 +45,10 @@ History:
  0.19   Added additional menu items to support start/stop/status of kismet (30/07/19)  
  0.20   Added bettercap web-ui support 
         Moved kismet and bettercap ctl scripts to common dir structure under
-        /home/wlanpi/nanohat-oled-scripts (01/08/19) 
+        /home/wlanpi/nanohat-oled-scripts (01/08/19)
+ 0.21   Added profiler start/stop via front panel menu & status info.
+        Re-organised menu system to have dedicated "apps" area. (02/08/19)
+        
 
 To do:
     1. Error handling to log?
@@ -66,6 +69,7 @@ import os
 import socket
 import types
 import re
+from textwrap import wrap
 
 __version__ = "0.20 (beta)"
 __author__  = "wifinigel@gmail.com"
@@ -146,6 +150,7 @@ hotspot_switcher_file = '/etc/wlanpihotspot/hotspot_switcher'
 # helper scripts to launch misc processes
 kismet_ctl_file = '/home/wlanpi/nanohat-oled-scripts/kismet_ctl'
 bettercap_ctl_file = '/home/wlanpi/nanohat-oled-scripts/bettercap_ctl'
+profiler_ctl_file = '/home/wlanpi/nanohat-oled-scripts/profiler_ctl'
 
 # Linux programs
 ifconfig_file = '/sbin/ifconfig'
@@ -225,41 +230,7 @@ def clear_display():
     # Draw a black filled box to clear the display.
     draw.rectangle((0,0,width,height), outline=0, fill=0)
 
-def display_dialog_msg(msg_list, back_button_req=0):
-
-    '''
-    display informational dialog box
-    '''
-    
-    global draw
-    global oled
-    global drawing_in_progress
-    global display_state
-    
-    drawing_in_progress = True
-    
-    # Clear display prior to painting new item
-    clear_display()
-    
-    # set start points for text
-    x=0
-    y=0
-    
-    for msg in msg_list:
-        draw.text((x, y),  msg,  font=fontb14, fill=255)
-        y +=16
-    
-    if back_button_req:
-        back_button()
-    
-    oled.drawImage(image)
-    
-    display_state = 'page'
-    drawing_in_progress = False
-    
-    return True
-
-def display_simple_table(item_list, back_button_req=0, title=''):
+def display_simple_table(item_list, back_button_req=0, title='', font="small"):
 
     '''
     This function takes a list and paints each entry as a line on a 
@@ -283,13 +254,21 @@ def display_simple_table(item_list, back_button_req=0, title=''):
     y = 0
     x = 0
     font_offset = 0
-    font_size = 11
-    item_length_max = 20
-    table_display_max = 5
+    
+    if font == "small":
+        font_type = smartFont
+        font_size = 11
+        item_length_max = 20
+        table_display_max = 5
+    elif font == "medium":
+        font_type = font11
+        font_size = 11
+        item_length_max = 17
+        table_display_max = 4
     
     # write title if present
     if title != '':
-        draw.text((x, y + font_offset), title.center(item_length_max, " "),  font=smartFont, fill=255)
+        draw.text((x, y + font_offset), title.center(item_length_max, " "),  font=font_type, fill=255)
         font_offset += font_size
         table_display_max -=1
     
@@ -319,7 +298,7 @@ def display_simple_table(item_list, back_button_req=0, title=''):
         if len(item) > item_length_max:
             item = item[0:item_length_max]
 
-        draw.text((x, y + font_offset), item,  font=smartFont, fill=255)
+        draw.text((x, y + font_offset), item,  font=font_type, fill=255)
         
         font_offset += font_size
     
@@ -333,6 +312,44 @@ def display_simple_table(item_list, back_button_req=0, title=''):
     drawing_in_progress = False
     
     return
+
+def display_dialog_msg(msg, back_button_req=0, wrap_limit=17, font="medium"):
+
+    '''
+    display informational dialog box
+    '''
+    
+    global draw
+    global oled
+    global drawing_in_progress
+    global display_state
+    
+    msg_list = wrap(msg, wrap_limit)
+    display_simple_table(msg_list, back_button_req=1, title='Info:', font=font)
+    '''
+    drawing_in_progress = True
+    
+    # Clear display prior to painting new item
+    clear_display()
+    
+    # set start points for text
+    x=0
+    y=0
+    
+    for msg in msg_list:
+        draw.text((x, y),  msg,  font=fontb14, fill=255)
+        y +=16
+    
+    if back_button_req:
+        back_button()
+    
+    oled.drawImage(image)
+    
+    display_state = 'page'
+    drawing_in_progress = False
+    
+    return True
+    '''
 
 def display_paged_table(table_data, back_button_req=0):
 
@@ -926,7 +943,7 @@ def show_ufw():
     # check ufw is available
     if not os.path.isfile(ufw_file):
         
-        display_dialog_msg(['UFW not', 'installed'], back_button_req=1)
+        display_dialog_msg('UFW not installed', back_button_req=1)
         
         display_state = 'page'
         return
@@ -980,7 +997,7 @@ def show_menu_ver():
 
     global __version__
     
-    display_simple_table(["Menu version:", __version__], back_button_req=1)
+    display_simple_table(["Menu version:", __version__], back_button_req=1, font="medium")
     
 
 def shutdown():
@@ -989,7 +1006,7 @@ def shutdown():
     global shutdown_in_progress
     global screen_cleared
     
-    display_dialog_msg(['Shutting down...'], back_button_req=0)
+    display_dialog_msg('Shutting down...', back_button_req=0)
     time.sleep(1)
 
     oled.clearDisplay()
@@ -1005,7 +1022,7 @@ def reboot():
     global shutdown_in_progress
     global screen_cleared
     
-    display_dialog_msg(['Rebooting...'], back_button_req=0)
+    display_dialog_msg('Rebooting...', back_button_req=0)
     time.sleep(1)
 
     oled.clearDisplay()
@@ -1029,7 +1046,7 @@ def switcher(resource_title, resource_switcher_file, mode_name):
     # check resource is available
     if not os.path.isfile(resource_switcher_file):
         
-        display_dialog_msg([resource_title, 'not available'], back_button_req=1)
+        display_dialog_msg('{} not available'.format(resource_title), back_button_req=1)
         display_state = 'page'
         return
     
@@ -1038,13 +1055,13 @@ def switcher(resource_title, resource_switcher_file, mode_name):
     
     if current_mode == "classic":
         # if in classic mode, switch to the resource
-        dialog_msg = ['Switching to', resource_title, 'mode', "(rebooting...)"]
+        dialog_msg = 'Switching to {} mode (rebooting...)'.format(resource_title)
         switch = "on"
     elif current_mode == mode_name:
-        dialog_msg = ['Switching to', 'Classic', 'mode', "(rebooting...)"]
+        dialog_msg = 'Switching to Classic mode (rebooting...)'
         switch = "off"
     else:
-        dialog_msg(['Unknown mode:', current_mode], back_button_req=1)
+        dialog_msg('Unknown mode: {}'.format(current_mode), back_button_req=1)
         display_state = 'page'
         return False
     
@@ -1058,7 +1075,7 @@ def switcher(resource_title, resource_switcher_file, mode_name):
 
         subprocess.call("{} {}".format(resource_switcher_file, switch), shell=True) # reboots
     except Exception as ex:
-        dialog_msg = ['Switch failed!', str(ex)]
+        dialog_msg = 'Switch failed! {}'.format(ex)
         back_button_req=1
     
     # We only get to this point if the switch has failed for some reason
@@ -1103,28 +1120,28 @@ def kismet_ctl(action="status"):
     
     # check resource is available
     if not os.path.isfile(kismet_ctl_file):        
-        display_dialog_msg([kismet_ctl_file, 'not available'], back_button_req=1)
+        display_dialog_msg('{} not available'.format(kismet_ctl_file), back_button_req=1)
         display_state = 'page'
         return
 
     if action=="status":
         # check kismet status & return text
         try:
-            dialog_msg = subprocess.check_output("{} {}".format(kismet_ctl_file, action), shell=True).split()
+            dialog_msg = subprocess.check_output("{} {}".format(kismet_ctl_file, action), shell=True)
         except Exception as ex:
-            dialog_msg = ['Status failed!', str(ex)]
+            dialog_msg = 'Status failed!'.format(ex)
         
     elif action=="start":
         try:
-            dialog_msg = subprocess.check_output("{} {}".format(kismet_ctl_file, action), shell=True).split()
+            dialog_msg = subprocess.check_output("{} {}".format(kismet_ctl_file, action), shell=True)
         except Exception as ex:
-            dialog_msg = ['Start failed!', str(ex)]
+            dialog_msg = 'Start failed!'.format(ex)
     
     elif action=="stop":
         try:
-            dialog_msg = subprocess.check_output("{} {}".format(kismet_ctl_file, action), shell=True).split()
+            dialog_msg = subprocess.check_output("{} {}".format(kismet_ctl_file, action), shell=True)
         except Exception as ex:
-            dialog_msg = ['Stop failed!', str(ex)]
+            dialog_msg = 'Stop failed! {}'.format(ex)
         
     display_dialog_msg(dialog_msg, back_button_req=1)
     display_state = 'page'
@@ -1153,28 +1170,28 @@ def bettercap_ctl(action="status"):
     
     # check resource is available
     if not os.path.isfile(bettercap_ctl_file):        
-        display_dialog_msg([bettercap_ctl_file, 'not available'], back_button_req=1)
+        display_dialog_msg('{} not available'.format(bettercap_ctl_file), back_button_req=1)
         display_state = 'page'
         return
 
     if action=="status":
         # check bettercap status & return text
         try:
-            dialog_msg = subprocess.check_output("{} {}".format(bettercap_ctl_file, action), shell=True).split()
+            dialog_msg = subprocess.check_output("{} {}".format(bettercap_ctl_file, action), shell=True)
         except Exception as ex:
-            dialog_msg = ['Status failed!', str(ex)]
+            dialog_msg = 'Status failed!'.format(ex)
         
     elif action=="start":
         try:
-            dialog_msg = subprocess.check_output("{} {}".format(bettercap_ctl_file, action), shell=True).split()
+            dialog_msg = subprocess.check_output("{} {}".format(bettercap_ctl_file, action), shell=True)
         except Exception as ex:
-            dialog_msg = ['Start failed!', str(ex)]
+            dialog_msg = 'Start failed!'.format(ex)
     
     elif action=="stop":
         try:
-            dialog_msg = subprocess.check_output("{} {}".format(bettercap_ctl_file, action), shell=True).split()
+            dialog_msg = subprocess.check_output("{} {}".format(bettercap_ctl_file, action), shell=True)
         except Exception as ex:
-            dialog_msg = ['Stop failed!', str(ex)]
+            dialog_msg = 'Stop failed!'.format(ex)
         
     display_dialog_msg(dialog_msg, back_button_req=1)
     display_state = 'page'
@@ -1190,6 +1207,80 @@ def bettercap_stop():
     
 def bettercap_start():
     bettercap_ctl(action="start")
+    return
+
+def profiler_ctl(action="status"):
+    '''
+    Function to start/stop and get status of Profiler processe
+    '''
+
+    global profiler_ctl_file
+    global display_state
+    
+    # check resource is available
+    if not os.path.isfile(profiler_ctl_file):        
+        display_dialog_msg('not available'.format(profiler_ctl_file), back_button_req=1)
+        display_state = 'page'
+        return
+
+    if action=="status":
+        # check profiler status & return text
+        try:
+            status_file_content = subprocess.check_output("{} {}".format(profiler_ctl_file, action), shell=True)
+            item_list =  status_file_content.splitlines()          
+        except Exception as ex:
+            item_list = ['Status failed!', str(ex)]
+            
+        display_simple_table(item_list, back_button_req=1, title='Profiler Status')
+        display_state = 'page'
+        return True
+        
+    elif action=="start":
+        try:
+            dialog_msg = subprocess.check_output("{} {}".format(profiler_ctl_file, action), shell=True)
+        except Exception as ex:
+            dialog_msg = 'Start failed!'.format(ex)
+            
+    elif action=="start_no11r":
+        try:
+            dialog_msg = subprocess.check_output("{} {}".format(profiler_ctl_file, action), shell=True)
+        except Exception as ex:
+            dialog_msg = 'Start failed!'.format(ex)
+    
+    elif action=="stop":
+        try:
+            dialog_msg = subprocess.check_output("{} {}".format(profiler_ctl_file, action), shell=True)
+        except Exception as ex:
+            dialog_msg = 'Stop failed!'.format(ex)
+            
+    elif action=="purge":
+        try:
+            dialog_msg = subprocess.check_output("{} {}".format(profiler_ctl_file, action), shell=True)
+        except Exception as ex:
+            dialog_msg = 'Report purge failed!'.format(ex)
+        
+    display_dialog_msg(dialog_msg, back_button_req=1)
+    display_state = 'page'
+    return True
+
+def profiler_status():
+    profiler_ctl(action="status")
+    return
+    
+def profiler_stop():
+    profiler_ctl(action="stop")
+    return
+    
+def profiler_start():
+    profiler_ctl(action="start")
+    return
+
+def profiler_start_no11r():
+    profiler_ctl(action="start_no11r")
+    return
+
+def profiler_purge():
+    profiler_ctl(action="purge")
     return
 
 def home_page():
@@ -1372,7 +1463,30 @@ menu = [
             { "name": "3.Version", "action": show_menu_ver},
         ]
       },
-      { "name": "3.Actions", "action": [
+      { "name": "3.Apps", "action": [
+            { "name": "1.Kismet",   "action": [
+                { "name": "Status", "action": kismet_status},
+                { "name": "Stop", "action":   kismet_stop},
+                { "name": "Start", "action":  kismet_start},
+                ]
+            },
+            { "name": "2.Bettercap",   "action": [
+                { "name": "Status", "action": bettercap_status},
+                { "name": "Stop", "action":   bettercap_stop},
+                { "name": "Start", "action":  bettercap_start},
+                ]
+            },
+            { "name": "3.Profiler",   "action": [
+                { "name": "Status", "action":          profiler_status},
+                { "name": "Stop", "action":            profiler_stop},
+                { "name": "Start", "action":           profiler_start},
+                { "name": "Start (no 11r)", "action":  profiler_start_no11r},
+                { "name": "Purge Reports", "action":   profiler_purge},
+                ]
+            },
+        ]
+      },
+      { "name": "4.Actions", "action": [
             { "name": "1.W-Console",   "action": [
                 { "name": "Cancel", "action": go_up},
                 { "name": "Confirm", "action": wconsole_switcher},
@@ -1383,24 +1497,12 @@ menu = [
                 { "name": "Confirm", "action": hotspot_switcher},
                 ]
             },
-            { "name": "3.Kismet",   "action": [
-                { "name": "Status", "action": kismet_status},
-                { "name": "Stop", "action":   kismet_stop},
-                { "name": "Start", "action":  kismet_start},
-                ]
-            },
-            { "name": "4.Bettercap",   "action": [
-                { "name": "Status", "action": bettercap_status},
-                { "name": "Stop", "action":   bettercap_stop},
-                { "name": "Start", "action":  bettercap_start},
-                ]
-            },
-            { "name": "5.Reboot",   "action": [
+            { "name": "3.Reboot",   "action": [
                 { "name": "Cancel", "action": go_up},
                 { "name": "Confirm", "action": reboot},
                 ]
             },
-            { "name": "6.Shutdown", "action": [
+            { "name": "4.Shutdown", "action": [
                 { "name": "Cancel", "action": go_up},
                 { "name": "Confirm", "action": shutdown},
                 ]
@@ -1432,6 +1534,8 @@ if current_mode != "classic":
                 },
             ]
           }
+    
+    menu.pop(3)
 
 # Set up handlers to process key presses
 def receive_signal(signum, stack):
