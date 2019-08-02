@@ -71,7 +71,7 @@ import types
 import re
 from textwrap import wrap
 
-__version__ = "0.20 (beta)"
+__version__ = "0.21 (beta)"
 __author__  = "wifinigel@gmail.com"
 
 ############################
