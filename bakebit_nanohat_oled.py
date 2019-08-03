@@ -48,6 +48,8 @@ History:
         /home/wlanpi/nanohat-oled-scripts (01/08/19)
  0.21   Added profiler start/stop via front panel menu & status info.
         Re-organised menu system to have dedicated "apps" area. (02/08/19)
+ 0.22   Added Ethernet port speed support via Ethtool on Classic mode
+        home page(03/08/19)
         
 
 To do:
@@ -71,7 +73,7 @@ import types
 import re
 from textwrap import wrap
 
-__version__ = "0.21 (beta)"
+__version__ = "0.22 (beta)"
 __author__  = "wifinigel@gmail.com"
 
 ############################
@@ -156,6 +158,7 @@ profiler_ctl_file = '/home/wlanpi/nanohat-oled-scripts/profiler_ctl'
 ifconfig_file = '/sbin/ifconfig'
 iw_file = '/usr/sbin/iw'
 ufw_file = '/usr/sbin/ufw'
+ethtool_file = '/sbin/ethtool'
 
 
 # check our current mode
@@ -1292,6 +1295,7 @@ def home_page():
     global hostname
     global drawing_in_progress
     global display_state
+    global ethtool_file
     
     drawing_in_progress = True
     display_state = 'page'
@@ -1310,6 +1314,28 @@ def home_page():
         # get eth0 IP
         if_name = "eth0"
         mode_name = ""
+        
+        # get Ethernet port info (...for Jerry)
+        try:
+            #eth_speed_info  = subprocess.check_output("{} eth0  | grep -i speed | cut -d' ' -f2".format(ethtool_file), shell=True)
+            eth_info = subprocess.check_output('{} eth0'.format(ethtool_file), shell=True)
+            speed_re = re.findall('Speed\: (.*\/s)', eth_info, re.MULTILINE)
+            duplex_re = re.findall('Duplex\: (.*)', eth_info, re.MULTILINE)
+            link_re = re.findall('Link detected\: (.*)', eth_info, re.MULTILINE)
+                      
+            if (speed_re is None) or (duplex_re is None) or (link_re is None):
+                # Our pattern matching failed...silently fail....we must set up logging at some stage
+                mode_name = ""
+            elif (link_re[0] == "no"):
+                # Ethernet link is down, report msg instead of speed & duplex
+                mode_name = "Link down" 
+            else:
+                # Report the speed & duplex messages from ethtool
+                mode_name = "{} {}".format(speed_re[0], duplex_re[0])
+            
+        except Exception as ex:
+            # Something went wrong...show nothing
+            mode_name = ""
     
     ip_addr_cmd = "ip addr show {} | grep -Po \'inet \K[\d.]+\'".format(if_name) 
 
