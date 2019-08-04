@@ -7,21 +7,22 @@ The project is currently a single Python script that has been created using the 
 
 ## Status
 
-This project is now ready for beta tetsting. No further significant changes are anticipated in the short term.
+This project is now ready for beta testing. No further significant changes are anticipated in the short term.
 
 ## Installation
 
-If you would like to have a look at the current menu system on your WLANPi, download the "bakebit_nanohat_oled.py" file from this project and copy it to your WLANPi directory "/home/wlanpi/NanoHatOLED/BakeBit/Software/Python". It's probably a good idea to make a backup of you existing "bakebit_nanohat_oled.py" before copying in the new file.
+To install the menu system, obtain the gzipped archive file in the "bundle" directory of the project github repo (https://github.com/WLAN-Pi/wlanpi-nanohat-oled/bundle)
 
-Once the file is in position check that the file is owned by the root user and is executable by root. The following commands should do the trick:
+Log in to the WLANPi as the "wlanpi" user. Copy the archive file into the /home/wlanpi directory of the WLANPI. Extract the files from the archive using the commands:
 
 ```
- cd /home/wlanpi/NanoHatOLED/BakeBit/Software/Python/
- sudo chown root:root bakebit_nanohat_oled.py
- sudo chmod 755 bakebit_nanohat_oled.py
+ # Note this operation is done as the WLANPi user
+ cd /home/wlanpi
+ tar xvfz wlanpi-nanohat-oled-v0.xx.tar.gz
+```
 ```
 
-Once the file is installed, reboot the WLANPi and the new menu system should be visible on the OLED display.
+Once the files are extracted, reboot the WLANPi and the new menu system should be visible on the OLED display.
 
 ![WLANPi Menu](https://github.com/WLAN-Pi/wlanpi-nanohat-oled/blob/master/images/wlanpi_menu.jpg)
 
@@ -31,7 +32,7 @@ As we have only 3 buttons on the front of the WLANPi, an easy-to-use navigation 
 
 At the bottom of each screen display, contextual button labels are provided that show the available navigation options.
 
-To move vertically through a menu, a "Down" button is provided. By repeatedly hitting the "Down" button, it is possible to move through all available menu options. If more than one screenful of menu items are avalable, then scrolling down will move through all available options in a circular path. Hitting the "Next" button will move to a sub-menu level, or select a page of information, depending on the current level in the menu structure.
+To move vertically through a menu, a "Down" button is provided. By repeatedly hitting the "Down" button, it is possible to move through all available menu options. If more than one screenful of menu items are available, then scrolling down will move through all available options in a circular path. Hitting the "Next" button will move to a sub-menu level, or select a page of information, depending on the current level in the menu structure.
 
 When a menu structure is displayed, a "Back" button is provided to move back up to parent menu items. 
 
@@ -77,6 +78,28 @@ When a button is pressed, the flow of the script is taken over by the interrupt 
 
 I've tried to add a bit more of an explanation in the source code notes for anyone who may be interested in this area. A lot of this has been derived from observations and testing during development of the script, so there may still be holes in my knowledge in this area.
 
-## Acknowledgements
+## Helper Scripts
+
+This project now includes a number of helper scripts to provide additional features to allow the use of programs such as Kismet & Profiler from the front panel menu system. Further details on these scripts can be found [here](scripts/).
+
+## Files & Locations
+
+The front panel menu system now comprises several files rather than the single original "bakebit_nanohat_oled.py" Python script. Several helper scripts are now also provided to extend the capabilities of the menu system. 
+
+The file-set, together with file locations and permissions are listed below. The files will generally be bundled together in a tar archive in the "bundle" of this project for ease of downloading and installation. 
+
+```
+
+ /home/wlanpi/nanohat-oled-scripts :
+    -rwxr-xr-x 1 wlanpi wlanpi  bettercap_ctl
+    -rwxr-xr-x 1 wlanpi wlanpi  kismet_ctl
+    -rwxr-xr-x 1 wlanpi wlanpi  profiler_ctl
+
+ /home/wlanpi/NanoHatOLED/BakeBit/Software/Python:
+    -rwxr--r-- 1 root   root  bakebit_nanohat_oled.py
+
+```
+
+## Acknowledgments
 
 Props to Bryce Royal for the early work on this initiative and his ideas around the screen layout.
