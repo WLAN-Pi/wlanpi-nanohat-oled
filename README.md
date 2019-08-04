@@ -11,7 +11,7 @@ This project is now ready for beta testing. No further significant changes are a
 
 ## Installation
 
-To install the menu system, obtain the gzipped archive file in the "bundle" directory of the project github repo (https://github.com/WLAN-Pi/wlanpi-nanohat-oled/bundle)
+To install the menu system, obtain the gzipped archive file in the "bundle" directory of the project github repo (https://github.com/WLAN-Pi/wlanpi-nanohat-oled/tree/master/bundle)
 
 Log in to the WLANPi as the "wlanpi" user. Copy the archive file into the /home/wlanpi directory of the WLANPI. Extract the files from the archive using the commands:
 
