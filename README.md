@@ -20,7 +20,6 @@ Log in to the WLANPi as the "wlanpi" user. Copy the archive file into the /home/
  cd /home/wlanpi
  tar xvfz wlanpi-nanohat-oled-v0.xx.tar.gz
 ```
-```
 
 Once the files are extracted, reboot the WLANPi and the new menu system should be visible on the OLED display.
 
