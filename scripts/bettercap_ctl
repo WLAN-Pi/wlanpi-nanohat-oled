@@ -8,14 +8,15 @@
 # History:
 #
 # v0.01 - 31st July 2019 - initial version
-# v0.02 - 1st Aug 2019   - fixed path issue in version info
+# v0.02 - 1st  Aug 2019   - fixed path issue in version info
+# v0.03 - 12th Aug 2019 - removed networking restart when stopping profiler
 
 set -e
 
 NAME=bettercap_ctl
 HOME_DIR=/home/wlanpi/nanohat-oled-scripts
 DESC="Script to switch bettercap on/off"
-VERSION=0.02
+VERSION=0.03
 
 if [[ $EUID -ne 0 ]]; then
    echo "This script must be run as root" 
@@ -59,9 +60,6 @@ bettercap_stop () {
     return
   fi
   
-  # Bettercap docs also recommend restarting networking when Bettercap
-  # stops, so we'll do that for good measure (silently)
-  sudo service networking restart
 }
 
 ###############################################################################

@@ -7,8 +7,8 @@
 #
 # History:
 #
-# v0.01 - 1st Aug 2019 - initial version
-#
+# v0.01 - 1st  Aug 2019 - initial version
+# v0.02 - 12th Aug 2019 - removed networking restart when stopping profiler
 
 set -e
 
@@ -16,7 +16,7 @@ NAME=profiler_ctl
 HOME_DIR=/home/wlanpi/nanohat-oled-scripts
 REPORTS_DIR=/var/www/html/profiler/reports
 DESC="Script to switch profiler on/off"
-VERSION=0.01
+VERSION=0.02
 
 if [[ $EUID -ne 0 ]]; then
    echo "This script must be run as root" 
@@ -92,10 +92,6 @@ profiler_stop () {
     echo "Profiler not running"
     return
   fi
-  
-  # Profiler docs also recommend restarting networking when Profiler
-  # stops, so we'll do that for good measure (silently)
-  sudo service networking restart
 }
 
 ###############################################################################
