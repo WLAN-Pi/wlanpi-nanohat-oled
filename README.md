@@ -1,4 +1,6 @@
 # wlanpi-nanohat-oled
+*Deprecated - development has moved to the Bakebit repo since Aug 2019 https://github.com/WLAN-Pi/BakeBit* 
+
 WLANPi OLED display menu/navigation system
 
 This project aims to provide a more useful and flexible front-panel menu/navigation system for the WLANPi than is provided by default with the unit. This will allow more useful information to be displayed and various modes and settings to be configured from the front panel when network access if not available/possible.
