@@ -1,5 +1,5 @@
 # wlanpi-nanohat-oled
-*Deprecated - development has moved to the Bakebit repo since Aug 2019 https://github.com/WLAN-Pi/BakeBit* 
+******* Deprecated - development has moved to the Bakebit repo since Aug 2019 https://github.com/WLAN-Pi/BakeBit *******
 
 WLANPi OLED display menu/navigation system
 
